@@ -1,0 +1,47 @@
+@model List<(dupi.Models.UserProfile Profile, int ProjectCount)>
+@{
+    ViewData["Title"] = "Discover";
+}
+
+<div class="container mt-4">
+    <h1 class="mb-1">Discover</h1>
+    <p class="text-muted mb-4">Public portfolios from the community.</p>
+
+    @if (!Model.Any())
+    {
+        <p class="text-muted">No public profiles yet.</p>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            @foreach (var (profile, projectCount) in Model)
+            {
+                <div class="col">
+                    <a href="/u/@profile.Username" class="text-decoration-none">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center gap-3 mb-2">
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+                                         style="width:48px; height:48px; font-size:1.2rem; flex-shrink:0;">
+                                        @profile.DisplayName.FirstOrDefault().ToString().ToUpper()
+                                    </div>
+                                    <div class="overflow-hidden">
+                                        <div class="fw-semibold text-dark text-truncate">@profile.DisplayName</div>
+                                        <small class="text-muted">&#64;@profile.Username</small>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(profile.Bio))
+                                {
+                                    <p class="text-muted small mb-2" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">@profile.Bio</p>
+                                }
+                            </div>
+                            <div class="card-footer bg-transparent text-muted small">
+                                @projectCount @(projectCount == 1 ? "project" : "projects")
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+</div>

@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+
+# Secrets & credentials
+google-credds
+appsettings.Development.json
+
+# Third-party frontend libraries (restored via libman/npm)
+wwwroot/lib/
+
+# Uploads (local dev only, now on Azure Blob)
+wwwroot/uploads/
