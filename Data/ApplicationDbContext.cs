@@ -16,6 +16,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IDataPro
     public DbSet<NutritionPlan> NutritionPlans => Set<NutritionPlan>();
     public DbSet<Friendship> Friendships => Set<Friendship>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<Challenge> Challenges => Set<Challenge>();
+    public DbSet<ChallengeParticipant> ChallengeParticipants => Set<ChallengeParticipant>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -50,6 +52,33 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IDataPro
             e.HasOne<ApplicationUser>()
                 .WithMany()
                 .HasForeignKey(m => m.ReceiverId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Challenge>(e =>
+        {
+            e.HasIndex(c => c.CreatorId);
+            e.HasIndex(c => c.Status);
+
+            e.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(c => c.CreatorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ChallengeParticipant>(e =>
+        {
+            e.HasIndex(cp => new { cp.ChallengeId, cp.UserId }).IsUnique();
+            e.HasIndex(cp => cp.UserId);
+
+            e.HasOne<Challenge>()
+                .WithMany()
+                .HasForeignKey(cp => cp.ChallengeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(cp => cp.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

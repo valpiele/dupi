@@ -1,6 +1,7 @@
 @{
     int pending = ViewBag.Pending;
     int unread = ViewBag.Unread;
+    int challengeInvites = ViewBag.ChallengeInvites;
 }
 <li class="nav-item">
     <a class="nav-link position-relative" asp-controller="Friends" asp-action="Index">
@@ -17,6 +18,15 @@
         @if (unread > 0)
         {
             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem; min-width:1.1rem;">@unread</span>
+        }
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link position-relative" asp-controller="Challenge" asp-action="Index">
+        Challenges
+        @if (challengeInvites > 0)
+        {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem; min-width:1.1rem;">@challengeInvites</span>
         }
     </a>
 </li>

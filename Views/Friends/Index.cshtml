@@ -64,6 +64,8 @@
                                 <div class="d-flex gap-2 flex-shrink-0">
                                     <a asp-controller="Chat" asp-action="Index" asp-route-friendId="@friendId"
                                        class="btn btn-sm btn-outline-primary">Message</a>
+                                    <a asp-controller="Challenge" asp-action="Create" asp-route-friendId="@friendId"
+                                       class="btn btn-sm btn-outline-success">Challenge</a>
                                     <form asp-controller="Friends" asp-action="Unfriend" method="post" class="m-0">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="otherId" value="@friendId" />

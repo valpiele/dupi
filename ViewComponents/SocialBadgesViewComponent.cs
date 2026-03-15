@@ -8,11 +8,13 @@ public class SocialBadgesViewComponent : ViewComponent
 {
     private readonly SocialService _socialService;
     private readonly ChatService _chatService;
+    private readonly ChallengeService _challengeService;
 
-    public SocialBadgesViewComponent(SocialService socialService, ChatService chatService)
+    public SocialBadgesViewComponent(SocialService socialService, ChatService chatService, ChallengeService challengeService)
     {
         _socialService = socialService;
         _chatService = chatService;
+        _challengeService = challengeService;
     }
 
     public async Task<IViewComponentResult> InvokeAsync()
@@ -22,6 +24,7 @@ public class SocialBadgesViewComponent : ViewComponent
 
         ViewBag.Pending = await _socialService.GetPendingCountAsync(userId);
         ViewBag.Unread = await _chatService.GetUnreadCountAsync(userId);
+        ViewBag.ChallengeInvites = await _challengeService.GetPendingInviteCountAsync(userId);
         return View();
     }
 }

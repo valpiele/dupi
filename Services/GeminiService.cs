@@ -142,6 +142,85 @@ public class GeminiService
         }
     }
 
+    public async IAsyncEnumerable<(bool IsThinking, string Text)> StreamChallengeSummaryAsync(
+        string challengeText,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var schema = new
+        {
+            type = "OBJECT",
+            properties = new
+            {
+                winner_analysis   = new { type = "STRING",  description = "Analysis of the winner's performance and strategy" },
+                highlights        = new { type = "ARRAY", items = new { type = "STRING" }, description = "3-5 notable highlights from the challenge" },
+                improvement_tips  = new { type = "ARRAY", items = new { type = "STRING" }, description = "3 specific improvement tips for participants" },
+                fun_stats         = new { type = "ARRAY", items = new { type = "STRING" }, description = "3-5 fun or surprising statistics from the challenge" }
+            },
+            required = new[] { "winner_analysis", "highlights", "improvement_tips", "fun_stats" }
+        };
+
+        var prompt = $"""
+            You are a sports nutritionist and fitness coach reviewing a 7-day high protein challenge.
+            Provide an entertaining, motivating, and specific summary of the challenge results.
+            Reference actual numbers from the data. Include fun comparisons (e.g. "That's like eating X chicken breasts!").
+            Be encouraging even for participants who didn't hit their targets every day.
+
+            --- Challenge data ---
+            {challengeText}
+            --- End of data ---
+            """;
+
+        var body = new
+        {
+            contents = new[] { new { parts = new[] { new { text = prompt } } } },
+            generationConfig = new
+            {
+                responseMimeType = "application/json",
+                responseSchema = schema,
+                thinkingConfig = new { thinkingBudget = -1 }
+            }
+        };
+
+        var url = string.Format(StreamEndpoint, _apiKey);
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body)
+        };
+
+        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+
+        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct);
+            if (line == null || !line.StartsWith("data: ")) continue;
+
+            JsonElement chunk;
+            try { chunk = JsonSerializer.Deserialize<JsonElement>(line["data: ".Length..]); }
+            catch { continue; }
+
+            if (!chunk.TryGetProperty("candidates", out var candidates) || candidates.GetArrayLength() == 0) continue;
+            if (!candidates[0].TryGetProperty("content", out var content)) continue;
+            if (!content.TryGetProperty("parts", out var parts)) continue;
+
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (!part.TryGetProperty("text", out var textEl)) continue;
+                var text = textEl.GetString() ?? "";
+                if (string.IsNullOrEmpty(text)) continue;
+                bool isThought = part.TryGetProperty("thought", out var thoughtEl) && thoughtEl.GetBoolean();
+                yield return (isThought, text);
+            }
+        }
+    }
+
     private object BuildBody(string? userText, byte[]? fileData, string? mimeType, string? contextSummary, bool withThinking)
     {
         var parts = new List<object>();

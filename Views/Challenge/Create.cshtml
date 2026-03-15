@@ -1,0 +1,111 @@
+@model dupi.Models.ChallengeCreateViewModel
+@{
+    ViewData["Title"] = "Create Challenge";
+    var friends = ViewBag.Friends as List<(dupi.Models.Friendship F, dupi.Models.UserProfile? Profile)> ?? new();
+}
+
+<div style="max-width:560px; margin:0 auto;" class="mt-4">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Create Challenge</h2>
+            <p class="text-muted small mb-0">Set up a 7-day high protein challenge.</p>
+        </div>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm" style="border-radius:6px;">← Back</a>
+    </div>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <form asp-action="Create" method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold small">Title</label>
+            <input type="text" name="Title" class="form-control" value="@Model.Title"
+                   placeholder="e.g. Protein Power Week" maxlength="100" required
+                   style="border-radius:8px;" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold small">Daily Protein Target (grams)</label>
+            <div class="d-flex align-items-center gap-3">
+                <input type="range" name="ProteinTargetGrams" id="proteinSlider"
+                       min="10" max="300" step="5" value="@Model.ProteinTargetGrams"
+                       class="form-range flex-grow-1" oninput="document.getElementById('proteinVal').textContent = this.value + 'g'" />
+                <span id="proteinVal" class="fw-bold" style="min-width:50px;">@(Model.ProteinTargetGrams)g</span>
+            </div>
+            <div class="text-muted small mt-1">Typical: 1.6–2.2g per kg of body weight. Default is 120g.</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold small">Challenge Type</label>
+            <div class="d-flex gap-2">
+                <label class="card flex-fill text-center py-3 px-2" style="cursor:pointer; border-radius:10px;" id="label-friend">
+                    <input type="radio" name="Type" value="FriendChallenge" class="d-none" id="type-friend"
+                           @(Model.Type == dupi.Models.ChallengeType.FriendChallenge ? "checked" : "") onchange="updateType()" />
+                    <div class="fw-semibold small">Friend Challenge</div>
+                    <div class="text-muted" style="font-size:0.75rem;">Invite specific friends</div>
+                </label>
+                <label class="card flex-fill text-center py-3 px-2" style="cursor:pointer; border-radius:10px;" id="label-community">
+                    <input type="radio" name="Type" value="Community" class="d-none" id="type-community"
+                           @(Model.Type == dupi.Models.ChallengeType.Community ? "checked" : "") onchange="updateType()" />
+                    <div class="fw-semibold small">Community</div>
+                    <div class="text-muted" style="font-size:0.75rem;">Open for anyone to join</div>
+                </label>
+            </div>
+        </div>
+
+        <div id="friendSelector" class="mb-3" style="@(Model.Type == dupi.Models.ChallengeType.Community ? "display:none" : "")">
+            <label class="form-label fw-semibold small">Invite Friends</label>
+            @if (!friends.Any())
+            {
+                <p class="text-muted small">No friends yet. <a asp-controller="Discover" asp-action="Index">Find people to add.</a></p>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-2" style="max-height:240px; overflow-y:auto;">
+                    @foreach (var (f, profile) in friends)
+                    {
+                        var friendId = f.SenderId == ViewContext.HttpContext.User.FindFirst("dupi:uid")?.Value ? f.ReceiverId : f.SenderId;
+                        var name = profile?.DisplayName ?? "Unknown";
+                        var isChecked = Model.InvitedFriendIds.Contains(friendId);
+                        <label class="d-flex align-items-center gap-2 p-2 rounded" style="cursor:pointer; border:1px solid #eee;">
+                            <input type="checkbox" name="InvitedFriendIds" value="@friendId" @(isChecked ? "checked" : "") />
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                                 style="width:32px; height:32px; font-size:0.8rem;">
+                                @name.FirstOrDefault().ToString().ToUpper()
+                            </div>
+                            <span class="small fw-medium">@name</span>
+                        </label>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label fw-semibold small">Description (optional)</label>
+            <textarea name="Description" class="form-control" rows="2" maxlength="500"
+                      placeholder="Any rules or motivation for participants..."
+                      style="border-radius:8px;">@Model.Description</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-dark w-100 py-2" style="border-radius:8px;">Create Challenge</button>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+function updateType() {
+    const isFriend = document.getElementById('type-friend').checked;
+    document.getElementById('friendSelector').style.display = isFriend ? '' : 'none';
+
+    document.getElementById('label-friend').style.borderColor = isFriend ? '#1a1a1a' : '#dee2e6';
+    document.getElementById('label-friend').style.borderWidth = isFriend ? '2px' : '1px';
+    document.getElementById('label-community').style.borderColor = !isFriend ? '#1a1a1a' : '#dee2e6';
+    document.getElementById('label-community').style.borderWidth = !isFriend ? '2px' : '1px';
+}
+updateType();
+</script>
+}

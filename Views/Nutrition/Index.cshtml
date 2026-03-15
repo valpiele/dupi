@@ -52,6 +52,8 @@
     </div>
 </div>
 
+@await Html.PartialAsync("_ChallengeBanner")
+
 @if (TempData["Error"] != null)
 {
     <div class="alert alert-danger">@TempData["Error"]</div>

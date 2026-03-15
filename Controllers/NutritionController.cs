@@ -1,8 +1,10 @@
 using dupi.Models;
 using dupi.Services;
+using dupi.Hubs;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -14,14 +16,19 @@ public class NutritionController : Controller
 {
     private readonly NutritionService _nutritionService;
     private readonly GeminiService _geminiService;
+    private readonly ChallengeService _challengeService;
+    private readonly IHubContext<ChatHub> _hubContext;
 
     private static readonly string[] AllowedMimeTypes =
         ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
-    public NutritionController(NutritionService nutritionService, GeminiService geminiService)
+    public NutritionController(NutritionService nutritionService, GeminiService geminiService,
+        ChallengeService challengeService, IHubContext<ChatHub> hubContext)
     {
         _nutritionService = nutritionService;
         _geminiService = geminiService;
+        _challengeService = challengeService;
+        _hubContext = hubContext;
     }
 
     private string UserId => User.FindFirstValue("dupi:uid")!;
@@ -33,6 +40,16 @@ public class NutritionController : Controller
         var today = DateTime.UtcNow.Date;
         var todayPlans = plans.Where(p => p.CreatedAt.Date == today).ToList();
         var streak = ComputeStreak(plans, today);
+
+        // Active challenge banner
+        await _challengeService.TransitionChallengesAsync();
+        var activeChallenge = await _challengeService.GetActiveChallengeForUserAsync(UserId);
+        if (activeChallenge != null)
+        {
+            ViewBag.ActiveChallenge = activeChallenge;
+            ViewBag.TodayProtein = todayPlans.Sum(p => p.Proteins);
+        }
+
         return View(new NutritionIndexViewModel { Plans = plans, TodayPlans = todayPlans, CurrentStreak = streak });
     }
 
@@ -153,6 +170,28 @@ public class NutritionController : Controller
         {
             using var ms = new MemoryStream(fileData);
             await _nutritionService.SaveFileAsync(UserId, plan.Id, extension, ms);
+        }
+
+        // Notify challenge participants if user has an active challenge
+        var activeChallenge = await _challengeService.GetActiveChallengeForUserAsync(UserId);
+        if (activeChallenge != null)
+        {
+            var participants = await _challengeService.ComputeLeaderboardAsync(activeChallenge.Id);
+            var displayName = User.FindFirstValue(ClaimTypes.Name) ?? "Someone";
+            foreach (var p in participants)
+            {
+                if (p.UserId != UserId)
+                {
+                    await _hubContext.Clients.Group(p.UserId).SendAsync("ChallengeUpdate", new
+                    {
+                        challengeId = activeChallenge.Id,
+                        userId = UserId,
+                        displayName,
+                        protein = analysis.Proteins,
+                        message = $"{displayName} logged {analysis.Proteins:0}g protein!"
+                    });
+                }
+            }
         }
 
         await Send(new { type = "done", redirectUrl = Url.Action(nameof(Result), new { id = plan.Id }) });
