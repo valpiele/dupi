@@ -9,7 +9,6 @@ public class GeminiService
 {
     private readonly HttpClient _http;
     private readonly string _apiKey;
-    private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={0}";
     private const string StreamEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key={0}";
 
     public GeminiService(HttpClient http, IConfiguration config)
@@ -17,28 +16,6 @@ public class GeminiService
         _http = http;
         _apiKey = config["Gemini:ApiKey"]
             ?? throw new InvalidOperationException("Gemini:ApiKey is not configured.");
-    }
-
-    public async Task<NutritionAnalysis> AnalyzeNutritionAsync(string? userText, byte[]? fileData, string? mimeType)
-    {
-        var url = string.Format(Endpoint, _apiKey);
-        var response = await _http.PostAsJsonAsync(url, BuildBody(userText, fileData, mimeType, withThinking: false));
-        if (!response.IsSuccessStatusCode)
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
-        }
-
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var text = json
-            .GetProperty("candidates")[0]
-            .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString() ?? "{}";
-
-        return JsonSerializer.Deserialize<NutritionAnalysis>(text)
-            ?? throw new InvalidOperationException("Could not parse Gemini structured response.");
     }
 
     public async IAsyncEnumerable<(bool IsThinking, string Text)> StreamAnalyzeNutritionAsync(
