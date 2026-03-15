@@ -77,52 +77,11 @@ public class ProfileService
         username.Length <= 30 &&
         Regex.IsMatch(username, @"^[a-zA-Z0-9_-]+$");
 
-    public List<(UserProfile Profile, int ProjectCount)> GetAllPublicProfiles()
+    public List<UserProfile> GetAllPublicProfiles()
     {
         return AllProfiles()
             .Where(p => p.IsPublic && !string.IsNullOrEmpty(p.Username))
-            .Select(p => (p, GetProjects(p.UserId).Count))
             .ToList();
-    }
-
-    // ---------- Projects ----------
-
-    public List<Project> GetProjects(string userId)
-    {
-        return _container.GetBlobs(prefix: $"{userId}/")
-            .Where(b => b.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-            .Select(b => new Project
-            {
-                FileName = Path.GetFileName(b.Name),
-                DisplayName = Path.GetFileNameWithoutExtension(b.Name),
-                FileSizeBytes = b.Properties.ContentLength ?? 0,
-                UploadedAt = b.Properties.CreatedOn?.LocalDateTime ?? DateTime.MinValue
-            })
-            .OrderByDescending(p => p.UploadedAt)
-            .ToList();
-    }
-
-    public async Task UploadProjectAsync(string userId, string fileName, Stream content)
-    {
-        var blob = _container.GetBlobClient($"{userId}/{fileName}");
-        await blob.UploadAsync(content, overwrite: true);
-    }
-
-    public Stream DownloadProject(string userId, string fileName)
-    {
-        var blob = _container.GetBlobClient($"{userId}/{Path.GetFileName(fileName)}");
-        var response = blob.DownloadStreaming();
-        return response.Value.Content;
-    }
-
-    public bool ProjectExists(string userId, string fileName)
-    {
-        return _container.GetBlobClient($"{userId}/{Path.GetFileName(fileName)}").Exists();
-    }
-
-    public void DeleteProject(string userId, string fileName)
-    {
-        _container.GetBlobClient($"{userId}/{Path.GetFileName(fileName)}").DeleteIfExists();
     }
 
     // ---------- Helpers ----------

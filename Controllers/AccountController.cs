@@ -68,7 +68,7 @@ public class AccountController : Controller
         {
             await _userManager.AddClaimAsync(user, new Claim("dupi:uid", user.Id));
             await _signInManager.SignInAsync(user, isPersistent: false);
-            return RedirectToAction("Index", "Projects");
+            return RedirectToAction("Index", "Discover");
         }
 
         foreach (var error in result.Errors)
