@@ -101,7 +101,7 @@ public class ChallengeService
         {
             ActiveChallenges = myChallenges
                 .Where(c => c.Status == ChallengeStatus.Active ||
-                            (c.Status == ChallengeStatus.Pending && c.CreatorId == userId))
+                            (c.Status == ChallengeStatus.Pending && !notAcceptedIds.Contains(c.Id)))
                 .OrderByDescending(c => c.StartDate)
                 .Select(c => (c, GetCount(c.Id), (int?)null, (int?)null))
                 .ToList(),
