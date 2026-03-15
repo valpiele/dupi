@@ -19,12 +19,12 @@ public class DiscoverController : Controller
     {
         var userId = User.FindFirstValue("dupi:uid");
         var profiles = _profileService.GetAllPublicProfiles()
-            .Where(p => p.Profile.UserId != userId)
+            .Where(p => p.UserId != userId)
             .ToList();
 
         if (!string.IsNullOrEmpty(userId))
         {
-            var ids = profiles.Select(p => p.Profile.UserId);
+            var ids = profiles.Select(p => p.UserId);
             ViewBag.FriendStatuses = await _socialService.GetStatusesAsync(userId, ids);
             ViewBag.CurrentUserId = userId;
         }
