@@ -24,6 +24,44 @@ public class NutritionService
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
 
+    public async Task<string?> GetRecentContextSummaryAsync(string userId)
+    {
+        var since = DateTime.UtcNow.AddDays(-7);
+        var recent = await _db.NutritionPlans
+            .Where(p => p.UserId == userId && p.CreatedAt >= since && p.CaloriesMin > 0)
+            .OrderBy(p => p.CreatedAt)
+            .ToListAsync();
+
+        if (recent.Count == 0) return null;
+
+        var days = recent
+            .GroupBy(p => p.CreatedAt.Date)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Meals logged in the past 7 days: {recent.Count} across {days.Count} day(s).");
+
+        var avgCalories = recent.Average(p => (p.CaloriesMin + p.CaloriesMax) / 2.0);
+        var avgProtein  = recent.Average(p => p.Proteins);
+        var avgCarbs    = recent.Average(p => p.Carbohydrates);
+        var avgFat      = recent.Average(p => p.Fats);
+        sb.AppendLine($"Average per meal: {avgCalories:0} kcal | Protein {avgProtein:0}g | Carbs {avgCarbs:0}g | Fat {avgFat:0}g");
+
+        var scoredMeals = recent.Where(p => p.Score > 0).ToList();
+        if (scoredMeals.Count > 0)
+            sb.AppendLine($"Average meal score: {scoredMeals.Average(p => p.Score):0.1}/10");
+
+        sb.AppendLine("Recent meals:");
+        foreach (var p in recent.TakeLast(7))
+        {
+            var mealLabel = string.IsNullOrEmpty(p.MealType) ? "" : $" [{p.MealType}]";
+            sb.AppendLine($"- {p.CreatedAt:MMM d}{mealLabel}: {p.FoodDescription} (~{(p.CaloriesMin + p.CaloriesMax) / 2} kcal, P:{p.Proteins:0}g C:{p.Carbohydrates:0}g F:{p.Fats:0}g, score {p.Score}/10)");
+        }
+
+        return sb.ToString();
+    }
+
     public Task<NutritionPlan?> GetPlanAsync(string userId, string planId) =>
         _db.NutritionPlans
             .FirstOrDefaultAsync(p => p.UserId == userId && p.Id == planId);

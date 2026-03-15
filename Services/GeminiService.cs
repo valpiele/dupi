@@ -19,13 +19,13 @@ public class GeminiService
     }
 
     public async IAsyncEnumerable<(bool IsThinking, string Text)> StreamAnalyzeNutritionAsync(
-        string? userText, byte[]? fileData, string? mimeType,
+        string? userText, byte[]? fileData, string? mimeType, string? contextSummary = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var url = string.Format(StreamEndpoint, _apiKey);
         var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = JsonContent.Create(BuildBody(userText, fileData, mimeType, withThinking: true))
+            Content = JsonContent.Create(BuildBody(userText, fileData, mimeType, contextSummary, withThinking: true))
         };
 
         var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -63,7 +63,7 @@ public class GeminiService
         }
     }
 
-    private object BuildBody(string? userText, byte[]? fileData, string? mimeType, bool withThinking)
+    private object BuildBody(string? userText, byte[]? fileData, string? mimeType, string? contextSummary, bool withThinking)
     {
         var parts = new List<object>();
 
@@ -79,7 +79,7 @@ public class GeminiService
             });
         }
 
-        parts.Add(new { text = BuildPrompt(userText) });
+        parts.Add(new { text = BuildPrompt(userText, contextSummary) });
 
         var schema = new
         {
@@ -128,7 +128,7 @@ public class GeminiService
         };
     }
 
-    private static string BuildPrompt(string? userText)
+    private static string BuildPrompt(string? userText, string? contextSummary)
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("You are a professional nutritionist and health coach.");
@@ -137,10 +137,19 @@ public class GeminiService
         sb.AppendLine("Score the meal from 1 (very unhealthy) to 10 (excellent nutrition).");
         sb.AppendLine("Be specific and actionable in your improvement suggestions.");
 
+        if (!string.IsNullOrWhiteSpace(contextSummary))
+        {
+            sb.AppendLine();
+            sb.AppendLine("--- User's recent nutrition history (last 7 days) ---");
+            sb.AppendLine(contextSummary);
+            sb.AppendLine("--- End of history ---");
+            sb.AppendLine("Use this context to make your feedback more personalised. Reference patterns you notice.");
+        }
+
         if (!string.IsNullOrWhiteSpace(userText))
         {
             sb.AppendLine();
-            sb.AppendLine("User's description:");
+            sb.AppendLine("User's description of the current meal:");
             sb.AppendLine(userText);
         }
 

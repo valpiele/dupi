@@ -84,11 +84,13 @@ public class NutritionController : Controller
             extension = Path.GetExtension(file.FileName).ToLower();
         }
 
+        var contextSummary = await _nutritionService.GetRecentContextSummaryAsync(UserId);
+
         var outputBuffer = new StringBuilder();
         try
         {
             await foreach (var (isThinking, text) in _geminiService.StreamAnalyzeNutritionAsync(
-                description, fileData, mimeType, HttpContext.RequestAborted))
+                description, fileData, mimeType, contextSummary, HttpContext.RequestAborted))
             {
                 if (isThinking)
                     await Send(new { type = "thinking", text });
