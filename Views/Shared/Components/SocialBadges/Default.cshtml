@@ -2,31 +2,32 @@
     int pending = ViewBag.Pending;
     int unread = ViewBag.Unread;
     int challengeInvites = ViewBag.ChallengeInvites;
+    string ctrl = ViewBag.CurrentController ?? "";
 }
-<li class="nav-item">
-    <a class="nav-link position-relative" asp-controller="Friends" asp-action="Index">
-        Friends
-        @if (pending > 0)
-        {
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem; min-width:1.1rem;">@pending</span>
-        }
-    </a>
-</li>
-<li class="nav-item">
-    <a class="nav-link position-relative" asp-controller="Chat" asp-action="Index">
-        Chat
-        @if (unread > 0)
-        {
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem; min-width:1.1rem;">@unread</span>
-        }
-    </a>
-</li>
-<li class="nav-item">
-    <a class="nav-link position-relative" asp-controller="Challenge" asp-action="Index">
-        Challenges
-        @if (challengeInvites > 0)
-        {
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem; min-width:1.1rem;">@challengeInvites</span>
-        }
-    </a>
-</li>
+<a class="sidebar-link @(ctrl == "friends" ? "active" : "")"
+   asp-controller="Friends" asp-action="Index" title="Friends">
+    <i class="bi bi-people"></i>
+    <span class="sidebar-label">Friends</span>
+    @if (pending > 0)
+    {
+        <span class="sidebar-badge">@pending</span>
+    }
+</a>
+<a class="sidebar-link @(ctrl == "chat" ? "active" : "")"
+   asp-controller="Chat" asp-action="Index" title="Chat">
+    <i class="bi bi-chat-dots"></i>
+    <span class="sidebar-label">Chat</span>
+    @if (unread > 0)
+    {
+        <span class="sidebar-badge">@unread</span>
+    }
+</a>
+<a class="sidebar-link @(ctrl == "challenge" ? "active" : "")"
+   asp-controller="Challenge" asp-action="Index" title="Challenges">
+    <i class="bi bi-trophy"></i>
+    <span class="sidebar-label">Challenges</span>
+    @if (challengeInvites > 0)
+    {
+        <span class="sidebar-badge">@challengeInvites</span>
+    }
+</a>

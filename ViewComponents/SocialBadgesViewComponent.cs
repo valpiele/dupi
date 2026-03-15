@@ -17,7 +17,7 @@ public class SocialBadgesViewComponent : ViewComponent
         _challengeService = challengeService;
     }
 
-    public async Task<IViewComponentResult> InvokeAsync()
+    public async Task<IViewComponentResult> InvokeAsync(string currentController = "")
     {
         var userId = UserClaimsPrincipal.FindFirstValue("dupi:uid");
         if (string.IsNullOrEmpty(userId)) return Content(string.Empty);
@@ -25,6 +25,7 @@ public class SocialBadgesViewComponent : ViewComponent
         ViewBag.Pending = await _socialService.GetPendingCountAsync(userId);
         ViewBag.Unread = await _chatService.GetUnreadCountAsync(userId);
         ViewBag.ChallengeInvites = await _challengeService.GetPendingInviteCountAsync(userId);
+        ViewBag.CurrentController = currentController;
         return View();
     }
 }
