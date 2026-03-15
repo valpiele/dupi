@@ -1,5 +1,6 @@
 using dupi.Models;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace dupi.Services;
@@ -9,6 +10,7 @@ public class GeminiService
     private readonly HttpClient _http;
     private readonly string _apiKey;
     private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={0}";
+    private const string StreamEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key={0}";
 
     public GeminiService(HttpClient http, IConfiguration config)
     {
@@ -18,6 +20,73 @@ public class GeminiService
     }
 
     public async Task<NutritionAnalysis> AnalyzeNutritionAsync(string? userText, byte[]? fileData, string? mimeType)
+    {
+        var url = string.Format(Endpoint, _apiKey);
+        var response = await _http.PostAsJsonAsync(url, BuildBody(userText, fileData, mimeType));
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
+        }
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var text = json
+            .GetProperty("candidates")[0]
+            .GetProperty("content")
+            .GetProperty("parts")[0]
+            .GetProperty("text")
+            .GetString() ?? "{}";
+
+        return JsonSerializer.Deserialize<NutritionAnalysis>(text)
+            ?? throw new InvalidOperationException("Could not parse Gemini structured response.");
+    }
+
+    public async IAsyncEnumerable<(bool IsThinking, string Text)> StreamAnalyzeNutritionAsync(
+        string? userText, byte[]? fileData, string? mimeType,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var url = string.Format(StreamEndpoint, _apiKey);
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(BuildBody(userText, fileData, mimeType))
+        };
+
+        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+
+        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct);
+            if (line == null || !line.StartsWith("data: ")) continue;
+
+            JsonElement chunk;
+            try { chunk = JsonSerializer.Deserialize<JsonElement>(line["data: ".Length..]); }
+            catch { continue; }
+
+            if (!chunk.TryGetProperty("candidates", out var candidates) || candidates.GetArrayLength() == 0) continue;
+            if (!candidates[0].TryGetProperty("content", out var content)) continue;
+            if (!content.TryGetProperty("parts", out var parts)) continue;
+
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (!part.TryGetProperty("text", out var textEl)) continue;
+                var text = textEl.GetString() ?? "";
+                if (string.IsNullOrEmpty(text)) continue;
+
+                bool isThought = part.TryGetProperty("thought", out var thoughtEl) && thoughtEl.GetBoolean();
+                yield return (isThought, text);
+            }
+        }
+    }
+
+    private object BuildBody(string? userText, byte[]? fileData, string? mimeType)
     {
         var parts = new List<object>();
 
@@ -35,7 +104,7 @@ public class GeminiService
 
         parts.Add(new { text = BuildPrompt(userText) });
 
-        var body = new
+        return new
         {
             contents = new[] { new { parts = parts.ToArray() } },
             generationConfig = new
@@ -61,25 +130,6 @@ public class GeminiService
                 }
             }
         };
-
-        var url = string.Format(Endpoint, _apiKey);
-        var response = await _http.PostAsJsonAsync(url, body);
-        if (!response.IsSuccessStatusCode)
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
-        }
-
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var text = json
-            .GetProperty("candidates")[0]
-            .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString() ?? "{}";
-
-        return JsonSerializer.Deserialize<NutritionAnalysis>(text)
-            ?? throw new InvalidOperationException("Could not parse Gemini structured response.");
     }
 
     private static string BuildPrompt(string? userText)

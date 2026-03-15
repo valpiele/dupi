@@ -67,7 +67,7 @@ builder.Services.AddDataProtection()
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<NutritionService>();
-builder.Services.AddHttpClient<GeminiService>();
+builder.Services.AddHttpClient<GeminiService>(c => c.Timeout = TimeSpan.FromMinutes(5));
 
 var app = builder.Build();
 
