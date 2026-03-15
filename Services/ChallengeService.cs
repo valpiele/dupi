@@ -53,7 +53,8 @@ public class ChallengeService
         _db.ChallengeParticipants.Add(new ChallengeParticipant
         {
             ChallengeId = challenge.Id,
-            UserId = creatorId
+            UserId = creatorId,
+            Accepted = true
         });
         await _db.SaveChangesAsync();
 
@@ -65,10 +66,12 @@ public class ChallengeService
 
     public async Task<ChallengeIndexViewModel> GetUserChallengesAsync(string userId)
     {
-        var participantChallengeIds = await _db.ChallengeParticipants
+        var myParticipations = await _db.ChallengeParticipants
             .Where(cp => cp.UserId == userId)
-            .Select(cp => cp.ChallengeId)
             .ToListAsync();
+
+        var participantChallengeIds = myParticipations.Select(cp => cp.ChallengeId).ToList();
+        var notAcceptedIds = myParticipations.Where(cp => !cp.Accepted).Select(cp => cp.ChallengeId).ToHashSet();
 
         var myChallenges = await _db.Challenges
             .Where(c => participantChallengeIds.Contains(c.Id))
@@ -97,12 +100,13 @@ public class ChallengeService
         return new ChallengeIndexViewModel
         {
             ActiveChallenges = myChallenges
-                .Where(c => c.Status == ChallengeStatus.Active)
+                .Where(c => c.Status == ChallengeStatus.Active ||
+                            (c.Status == ChallengeStatus.Pending && c.CreatorId == userId))
                 .OrderByDescending(c => c.StartDate)
                 .Select(c => (c, GetCount(c.Id), (int?)null, (int?)null))
                 .ToList(),
             PendingInvites = myChallenges
-                .Where(c => c.Status == ChallengeStatus.Pending && c.CreatorId != userId)
+                .Where(c => c.Status == ChallengeStatus.Pending && notAcceptedIds.Contains(c.Id))
                 .OrderByDescending(c => c.CreatedAt)
                 .Select(c => (c, GetCount(c.Id)))
                 .ToList(),
@@ -122,14 +126,26 @@ public class ChallengeService
         var challenge = await _db.Challenges.FindAsync(challengeId);
         if (challenge == null || challenge.EndDate <= DateTime.UtcNow) return false;
 
-        var exists = await _db.ChallengeParticipants
-            .AnyAsync(cp => cp.ChallengeId == challengeId && cp.UserId == userId);
-        if (exists) return false;
+        var existing = await _db.ChallengeParticipants
+            .FirstOrDefaultAsync(cp => cp.ChallengeId == challengeId && cp.UserId == userId);
+
+        if (existing != null)
+        {
+            // Already invited but hasn't accepted yet — accept now
+            if (!existing.Accepted)
+            {
+                existing.Accepted = true;
+                await _db.SaveChangesAsync();
+                return true;
+            }
+            return false; // already accepted
+        }
 
         _db.ChallengeParticipants.Add(new ChallengeParticipant
         {
             ChallengeId = challengeId,
-            UserId = userId
+            UserId = userId,
+            Accepted = true
         });
         await _db.SaveChangesAsync();
         return true;
@@ -346,14 +362,13 @@ public class ChallengeService
 
     public async Task<int> GetPendingInviteCountAsync(string userId)
     {
-        var participantChallengeIds = await _db.ChallengeParticipants
-            .Where(cp => cp.UserId == userId)
+        var notAcceptedChallengeIds = await _db.ChallengeParticipants
+            .Where(cp => cp.UserId == userId && !cp.Accepted)
             .Select(cp => cp.ChallengeId)
             .ToListAsync();
 
         return await _db.Challenges
-            .CountAsync(c => participantChallengeIds.Contains(c.Id) &&
-                             c.Status == ChallengeStatus.Pending &&
-                             c.CreatorId != userId);
+            .CountAsync(c => notAcceptedChallengeIds.Contains(c.Id) &&
+                             c.Status == ChallengeStatus.Pending);
     }
 }
