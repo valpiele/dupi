@@ -22,7 +22,7 @@ public class GeminiService
     public async Task<NutritionAnalysis> AnalyzeNutritionAsync(string? userText, byte[]? fileData, string? mimeType)
     {
         var url = string.Format(Endpoint, _apiKey);
-        var response = await _http.PostAsJsonAsync(url, BuildBody(userText, fileData, mimeType));
+        var response = await _http.PostAsJsonAsync(url, BuildBody(userText, fileData, mimeType, withThinking: false));
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync();
@@ -48,7 +48,7 @@ public class GeminiService
         var url = string.Format(StreamEndpoint, _apiKey);
         var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = JsonContent.Create(BuildBody(userText, fileData, mimeType))
+            Content = JsonContent.Create(BuildBody(userText, fileData, mimeType, withThinking: true))
         };
 
         var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -86,7 +86,7 @@ public class GeminiService
         }
     }
 
-    private object BuildBody(string? userText, byte[]? fileData, string? mimeType)
+    private object BuildBody(string? userText, byte[]? fileData, string? mimeType, bool withThinking)
     {
         var parts = new List<object>();
 
@@ -104,30 +104,46 @@ public class GeminiService
 
         parts.Add(new { text = BuildPrompt(userText) });
 
+        var schema = new
+        {
+            type = "OBJECT",
+            properties = new
+            {
+                food_description = new { type = "STRING", description = "Brief description of the food/meal observed" },
+                calories_min = new { type = "INTEGER", description = "Lower bound of estimated calorie range" },
+                calories_max = new { type = "INTEGER", description = "Upper bound of estimated calorie range" },
+                proteins = new { type = "NUMBER", description = "Estimated protein content in grams" },
+                carbohydrates = new { type = "NUMBER", description = "Estimated carbohydrate content in grams" },
+                fats = new { type = "NUMBER", description = "Estimated fat content in grams" },
+                whats_good = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 positive aspects of the meal" },
+                what_to_improve = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 specific actionable improvement suggestions" },
+                score = new { type = "INTEGER", description = "Overall nutritional score from 1 to 10" },
+                score_summary = new { type = "STRING", description = "One sentence explaining the score" }
+            },
+            required = new[] { "food_description", "calories_min", "calories_max", "proteins", "carbohydrates", "fats", "whats_good", "what_to_improve", "score", "score_summary" }
+        };
+
+        if (withThinking)
+        {
+            return new
+            {
+                contents = new[] { new { parts = parts.ToArray() } },
+                generationConfig = new
+                {
+                    responseMimeType = "application/json",
+                    responseSchema = schema,
+                    thinkingConfig = new { thinkingBudget = -1 }
+                }
+            };
+        }
+
         return new
         {
             contents = new[] { new { parts = parts.ToArray() } },
             generationConfig = new
             {
                 responseMimeType = "application/json",
-                responseSchema = new
-                {
-                    type = "OBJECT",
-                    properties = new
-                    {
-                        food_description = new { type = "STRING", description = "Brief description of the food/meal observed" },
-                        calories_min = new { type = "INTEGER", description = "Lower bound of estimated calorie range" },
-                        calories_max = new { type = "INTEGER", description = "Upper bound of estimated calorie range" },
-                        proteins = new { type = "NUMBER", description = "Estimated protein content in grams" },
-                        carbohydrates = new { type = "NUMBER", description = "Estimated carbohydrate content in grams" },
-                        fats = new { type = "NUMBER", description = "Estimated fat content in grams" },
-                        whats_good = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 positive aspects of the meal" },
-                        what_to_improve = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 specific actionable improvement suggestions" },
-                        score = new { type = "INTEGER", description = "Overall nutritional score from 1 to 10" },
-                        score_summary = new { type = "STRING", description = "One sentence explaining the score" }
-                    },
-                    required = new[] { "food_description", "calories_min", "calories_max", "proteins", "carbohydrates", "fats", "whats_good", "what_to_improve", "score", "score_summary" }
-                }
+                responseSchema = schema
             }
         };
     }
