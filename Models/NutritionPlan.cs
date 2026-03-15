@@ -20,6 +20,9 @@ public class NutritionPlan
     public double Proteins { get; set; }
     public double Carbohydrates { get; set; }
     public double Fats { get; set; }
+    public double Fiber { get; set; }
+    public double Sugar { get; set; }
+    public double Sodium { get; set; }
     public List<string> WhatsGood { get; set; } = new();
     public List<string> WhatToImprove { get; set; } = new();
     public int Score { get; set; }

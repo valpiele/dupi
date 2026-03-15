@@ -90,6 +90,32 @@
                 <div style="width:@cPct.ToString("0.#")%; background:#f59e0b;"></div>
                 <div style="width:@fPct.ToString("0.#")%; background:#ec4899;"></div>
             </div>
+            @if (Model.Fiber > 0 || Model.Sugar > 0 || Model.Sodium > 0)
+            {
+                <div class="d-flex gap-3 mt-3 pt-2 border-top">
+                    @if (Model.Fiber > 0)
+                    {
+                        <div class="text-center flex-fill">
+                            <div style="font-size:1rem; font-weight:700; color:#10b981;">@Model.Fiber.ToString("0.#")g</div>
+                            <div class="text-muted" style="font-size:0.75rem;">Fiber</div>
+                        </div>
+                    }
+                    @if (Model.Sugar > 0)
+                    {
+                        <div class="text-center flex-fill">
+                            <div style="font-size:1rem; font-weight:700; color:#8b5cf6;">@Model.Sugar.ToString("0.#")g</div>
+                            <div class="text-muted" style="font-size:0.75rem;">Sugar</div>
+                        </div>
+                    }
+                    @if (Model.Sodium > 0)
+                    {
+                        <div class="text-center flex-fill">
+                            <div style="font-size:1rem; font-weight:700; color:#64748b;">@Model.Sodium.ToString("0")mg</div>
+                            <div class="text-muted" style="font-size:0.75rem;">Sodium</div>
+                        </div>
+                    }
+                </div>
+            }
         </div>
     </div>
 

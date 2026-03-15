@@ -28,6 +28,15 @@ public class NutritionAnalysis
     [JsonPropertyName("what_to_improve")]
     public List<string> WhatToImprove { get; set; } = new();
 
+    [JsonPropertyName("fiber")]
+    public double Fiber { get; set; }
+
+    [JsonPropertyName("sugar")]
+    public double Sugar { get; set; }
+
+    [JsonPropertyName("sodium")]
+    public double Sodium { get; set; }
+
     [JsonPropertyName("score")]
     public int Score { get; set; }
 

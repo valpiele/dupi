@@ -92,12 +92,15 @@ public class GeminiService
                 proteins = new { type = "NUMBER", description = "Estimated protein content in grams" },
                 carbohydrates = new { type = "NUMBER", description = "Estimated carbohydrate content in grams" },
                 fats = new { type = "NUMBER", description = "Estimated fat content in grams" },
+                fiber = new { type = "NUMBER", description = "Estimated dietary fiber content in grams" },
+                sugar = new { type = "NUMBER", description = "Estimated total sugar content in grams" },
+                sodium = new { type = "NUMBER", description = "Estimated sodium content in milligrams" },
                 whats_good = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 positive aspects of the meal" },
                 what_to_improve = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 specific actionable improvement suggestions" },
                 score = new { type = "INTEGER", description = "Overall nutritional score from 1 to 10" },
                 score_summary = new { type = "STRING", description = "One sentence explaining the score" }
             },
-            required = new[] { "food_description", "calories_min", "calories_max", "proteins", "carbohydrates", "fats", "whats_good", "what_to_improve", "score", "score_summary" }
+            required = new[] { "food_description", "calories_min", "calories_max", "proteins", "carbohydrates", "fats", "fiber", "sugar", "sodium", "whats_good", "what_to_improve", "score", "score_summary" }
         };
 
         if (withThinking)
