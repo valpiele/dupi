@@ -1,4 +1,5 @@
 using dupi.Data;
+using dupi.Hubs;
 using dupi.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -65,8 +66,11 @@ builder.Services.AddDataProtection()
     .PersistKeysToDbContext<ApplicationDbContext>();
 
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<NutritionService>();
+builder.Services.AddScoped<SocialService>();
+builder.Services.AddScoped<ChatService>();
 builder.Services.AddHttpClient<GeminiService>(c => c.Timeout = TimeSpan.FromMinutes(5));
 
 var app = builder.Build();
@@ -89,6 +93,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapStaticAssets();
 
+app.MapHub<ChatHub>("/chatHub");
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")

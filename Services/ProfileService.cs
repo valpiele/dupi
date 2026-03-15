@@ -44,6 +44,14 @@ public class ProfileService
         blob.Upload(BinaryData.FromString(json), overwrite: true);
     }
 
+    public UserProfile? GetProfileByUserId(string userId)
+    {
+        var blob = _container.GetBlobClient($"{userId}/profile.json");
+        if (!blob.Exists()) return null;
+        var content = blob.DownloadContent().Value.Content.ToString();
+        return JsonSerializer.Deserialize<UserProfile>(content);
+    }
+
     public UserProfile? GetProfileByUsername(string username)
     {
         return AllProfiles().FirstOrDefault(p =>
