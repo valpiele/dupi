@@ -5,12 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Diagnostic — printed in Railway logs to confirm which variables are available
-Console.WriteLine($"[DB INIT] DATABASE_URL set: {!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DATABASE_URL"))}");
-Console.WriteLine($"[DB INIT] PGHOST: {Environment.GetEnvironmentVariable("PGHOST") ?? "NOT SET"}");
-Console.WriteLine($"[DB INIT] PGPORT: {Environment.GetEnvironmentVariable("PGPORT") ?? "NOT SET"}");
-Console.WriteLine($"[DB INIT] PGDATABASE: {Environment.GetEnvironmentVariable("PGDATABASE") ?? "NOT SET"}");
-
 // Resolve connection string — try DATABASE_URL, then individual PG* vars, then appsettings
 string connectionString;
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
