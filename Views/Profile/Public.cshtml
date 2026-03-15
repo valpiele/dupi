@@ -2,15 +2,56 @@
 @{
     ViewData["Title"] = Model.DisplayName;
     var projects = ViewBag.Projects as List<dupi.Models.Project> ?? new();
+    var friendStatus = ViewBag.FriendStatus as string;
+    var targetUserId = ViewBag.TargetUserId as string;
 }
 
 <div class="container mt-4">
-    <div class="mb-4">
-        <h1 class="mb-0">@Model.DisplayName</h1>
-        <div class="text-muted mb-2">&#64;@Model.Username</div>
-        @if (!string.IsNullOrWhiteSpace(Model.Bio))
+    <div class="mb-4 d-flex align-items-start justify-content-between flex-wrap gap-3">
+        <div>
+            <h1 class="mb-0">@Model.DisplayName</h1>
+            <div class="text-muted mb-2">&#64;@Model.Username</div>
+            @if (!string.IsNullOrWhiteSpace(Model.Bio))
+            {
+                <p class="text-muted mb-0">@Model.Bio</p>
+            }
+        </div>
+
+        @if (friendStatus != null && targetUserId != null)
         {
-            <p class="text-muted">@Model.Bio</p>
+            <div class="flex-shrink-0">
+                @if (friendStatus == "none")
+                {
+                    <form asp-controller="Friends" asp-action="SendRequest" method="post" class="m-0">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="receiverId" value="@targetUserId" />
+                        <input type="hidden" name="returnUrl" value="/u/@Model.Username" />
+                        <button type="submit" class="btn btn-dark btn-sm px-4">+ Add Friend</button>
+                    </form>
+                }
+                else if (friendStatus == "pending_sent")
+                {
+                    <button class="btn btn-outline-secondary btn-sm px-4" disabled>Request Sent</button>
+                }
+                else if (friendStatus == "pending_received")
+                {
+                    <a href="/Friends#requests" class="btn btn-warning btn-sm px-4">Respond to Request</a>
+                }
+                else if (friendStatus == "friends")
+                {
+                    <div class="d-flex gap-2">
+                        <a asp-controller="Chat" asp-action="Index" asp-route-friendId="@targetUserId"
+                           class="btn btn-outline-primary btn-sm px-4">Message</a>
+                        <form asp-controller="Friends" asp-action="Unfriend" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="otherId" value="@targetUserId" />
+                            <input type="hidden" name="returnUrl" value="/u/@Model.Username" />
+                            <button type="submit" class="btn btn-outline-secondary btn-sm"
+                                    onclick="return confirm('Remove friend?')">Unfriend</button>
+                        </form>
+                    </div>
+                }
+            </div>
         }
     </div>
 

@@ -3,16 +3,19 @@ using dupi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace dupi.Controllers;
 
 public class ProfileController : Controller
 {
     private readonly ProfileService _profileService;
+    private readonly SocialService _socialService;
 
-    public ProfileController(ProfileService profileService)
+    public ProfileController(ProfileService profileService, SocialService socialService)
     {
         _profileService = profileService;
+        _socialService = socialService;
     }
 
     private string UserId => User.FindFirstValue("dupi:uid")!;
@@ -56,12 +59,21 @@ public class ProfileController : Controller
     }
 
     [Route("u/{username}")]
-    public IActionResult Public(string username)
+    public async Task<IActionResult> Public(string username)
     {
         var profile = _profileService.GetPublicProfileByUsername(username);
         if (profile == null) return NotFound();
 
         ViewBag.Projects = _profileService.GetProjects(profile.UserId);
+
+        var currentUserId = User.FindFirstValue("dupi:uid");
+        if (!string.IsNullOrEmpty(currentUserId) && currentUserId != profile.UserId)
+        {
+            ViewBag.FriendStatus = await _socialService.GetStatusAsync(currentUserId, profile.UserId);
+            ViewBag.CurrentUserId = currentUserId;
+            ViewBag.TargetUserId = profile.UserId;
+        }
+
         return View(profile);
     }
 

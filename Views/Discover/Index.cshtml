@@ -1,6 +1,8 @@
 @model List<(dupi.Models.UserProfile Profile, int ProjectCount)>
 @{
     ViewData["Title"] = "Discover";
+    var statuses = ViewBag.FriendStatuses as Dictionary<string, string>;
+    var currentUserId = ViewBag.CurrentUserId as string;
 }
 
 <div class="container mt-4">
@@ -16,10 +18,13 @@
         <div class="row row-cols-1 row-cols-md-3 g-4">
             @foreach (var (profile, projectCount) in Model)
             {
+                var isOwnProfile = currentUserId == profile.UserId;
+                var status = statuses != null && statuses.TryGetValue(profile.UserId, out var s) ? s : "none";
+
                 <div class="col">
-                    <a href="/u/@profile.Username" class="text-decoration-none">
-                        <div class="card h-100 shadow-sm">
-                            <div class="card-body">
+                    <div class="card h-100 shadow-sm">
+                        <a href="/u/@profile.Username" class="text-decoration-none">
+                            <div class="card-body pb-2">
                                 <div class="d-flex align-items-center gap-3 mb-2">
                                     <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
                                          style="width:48px; height:48px; font-size:1.2rem; flex-shrink:0;">
@@ -32,14 +37,43 @@
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(profile.Bio))
                                 {
-                                    <p class="text-muted small mb-2" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">@profile.Bio</p>
+                                    <p class="text-muted small mb-0" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">@profile.Bio</p>
                                 }
                             </div>
-                            <div class="card-footer bg-transparent text-muted small">
-                                @projectCount @(projectCount == 1 ? "project" : "projects")
-                            </div>
+                        </a>
+                        <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">@projectCount @(projectCount == 1 ? "project" : "projects")</span>
+
+                            @if (!isOwnProfile && currentUserId != null)
+                            {
+                                <span>
+                                    @if (status == "none")
+                                    {
+                                        <form asp-controller="Friends" asp-action="SendRequest" method="post" class="m-0">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="receiverId" value="@profile.UserId" />
+                                            <input type="hidden" name="returnUrl" value="/Discover" />
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">+ Add Friend</button>
+                                        </form>
+                                    }
+                                    else if (status == "pending_sent")
+                                    {
+                                        <button class="btn btn-sm btn-outline-secondary" disabled>Pending</button>
+                                    }
+                                    else if (status == "pending_received")
+                                    {
+                                        <a asp-controller="Friends" asp-action="Index" class="btn btn-sm btn-warning"
+                                           href="/Friends#requests">Respond</a>
+                                    }
+                                    else if (status == "friends")
+                                    {
+                                        <a asp-controller="Chat" asp-action="Index" asp-route-friendId="@profile.UserId"
+                                           class="btn btn-sm btn-outline-success">Message</a>
+                                    }
+                                </span>
+                            }
                         </div>
-                    </a>
+                    </div>
                 </div>
             }
         </div>

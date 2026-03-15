@@ -87,6 +87,7 @@
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Nutrition" asp-action="Index">Nutrition</a>
                             </li>
+                            @await Component.InvokeAsync("SocialBadges")
                         }
                     </ul>
 
