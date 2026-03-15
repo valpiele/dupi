@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "dupi — Connect with people";
+    ViewData["Title"] = "dupi — Share your work";
 }
 
 <div style="max-width:680px; margin: 4rem auto; padding: 0 1rem;">
@@ -7,22 +7,22 @@
     @* Hero *@
     <div class="mb-5">
         <h1 style="font-size:2.8rem; font-weight:700; letter-spacing:-1.5px; color:#1a1a1a; line-height:1.15;">
-            Your profile,<br/>shared your way.
+            Your portfolio,<br/>shared your way.
         </h1>
         <p class="mt-3 mb-4" style="font-size:1.1rem; color:#666; max-width:480px;">
-            dupi lets you build a public profile, connect with friends, and share your story with anyone — in seconds.
+            dupi lets you upload your projects as PDFs, build a public profile, and share your work with anyone — in seconds.
         </p>
         @if (User.Identity?.IsAuthenticated == true)
         {
-            <a asp-controller="Discover" asp-action="Index"
-               class="btn btn-dark btn-lg px-4" style="border-radius:10px;">Discover people</a>
+            <a asp-controller="Projects" asp-action="Index"
+               class="btn btn-dark btn-lg px-4" style="border-radius:10px;">Go to my projects</a>
         }
         else
         {
             <a asp-controller="Account" asp-action="Login"
                class="btn btn-dark btn-lg px-4 me-2" style="border-radius:10px;">Get started</a>
             <a asp-controller="Discover" asp-action="Index"
-               class="btn btn-outline-secondary btn-lg px-4" style="border-radius:10px;">Browse profiles</a>
+               class="btn btn-outline-secondary btn-lg px-4" style="border-radius:10px;">Browse portfolios</a>
         }
     </div>
 
@@ -31,19 +31,19 @@
     @* Features *@
     <div class="row g-4 mb-5">
         <div class="col-md-4">
-            <div style="font-size:1.5rem; margin-bottom:.5rem;">👤</div>
+            <div style="font-size:1.5rem; margin-bottom:.5rem;">📄</div>
+            <h6 class="fw-semibold mb-1">Upload PDFs</h6>
+            <p class="text-muted small mb-0">Upload your project files and organise them in one place. No fuss.</p>
+        </div>
+        <div class="col-md-4">
+            <div style="font-size:1.5rem; margin-bottom:.5rem;">🔗</div>
             <h6 class="fw-semibold mb-1">Public profile</h6>
             <p class="text-muted small mb-0">Get a clean public URL like <code>dupi.app/u/yourname</code> to share with anyone.</p>
         </div>
         <div class="col-md-4">
-            <div style="font-size:1.5rem; margin-bottom:.5rem;">🤝</div>
-            <h6 class="fw-semibold mb-1">Connect with friends</h6>
-            <p class="text-muted small mb-0">Send friend requests, chat in real time, and grow your network.</p>
-        </div>
-        <div class="col-md-4">
             <div style="font-size:1.5rem; margin-bottom:.5rem;">🌍</div>
             <h6 class="fw-semibold mb-1">Discover others</h6>
-            <p class="text-muted small mb-0">Browse public profiles from the community and get inspired.</p>
+            <p class="text-muted small mb-0">Browse public portfolios from the community and get inspired.</p>
         </div>
     </div>
 

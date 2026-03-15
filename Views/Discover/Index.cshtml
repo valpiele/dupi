@@ -1,4 +1,4 @@
-@model List<dupi.Models.UserProfile>
+@model List<(dupi.Models.UserProfile Profile, int ProjectCount)>
 @{
     ViewData["Title"] = "Discover";
     var statuses = ViewBag.FriendStatuses as Dictionary<string, string>;
@@ -7,7 +7,7 @@
 
 <div class="container mt-4">
     <h1 class="mb-1">Discover</h1>
-    <p class="text-muted mb-4">Public profiles from the community.</p>
+    <p class="text-muted mb-4">Public portfolios from the community.</p>
 
     @if (!Model.Any())
     {
@@ -16,7 +16,7 @@
     else
     {
         <div class="row row-cols-1 row-cols-md-3 g-4">
-            @foreach (var profile in Model)
+            @foreach (var (profile, projectCount) in Model)
             {
                 var isOwnProfile = currentUserId == profile.UserId;
                 var status = statuses != null && statuses.TryGetValue(profile.UserId, out var s) ? s : "none";
@@ -41,34 +41,38 @@
                                 }
                             </div>
                         </a>
-                        @if (!isOwnProfile && currentUserId != null)
-                        {
-                            <div class="card-footer bg-transparent d-flex justify-content-end">
-                                @if (status == "none")
-                                {
-                                    <form asp-controller="Friends" asp-action="SendRequest" method="post" class="m-0">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="receiverId" value="@profile.UserId" />
-                                        <input type="hidden" name="returnUrl" value="/Discover" />
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">+ Add Friend</button>
-                                    </form>
-                                }
-                                else if (status == "pending_sent")
-                                {
-                                    <button class="btn btn-sm btn-outline-secondary" disabled>Pending</button>
-                                }
-                                else if (status == "pending_received")
-                                {
-                                    <a asp-controller="Friends" asp-action="Index" class="btn btn-sm btn-warning"
-                                       href="/Friends#requests">Respond</a>
-                                }
-                                else if (status == "friends")
-                                {
-                                    <a asp-controller="Chat" asp-action="Index" asp-route-friendId="@profile.UserId"
-                                       class="btn btn-sm btn-outline-success">Message</a>
-                                }
-                            </div>
-                        }
+                        <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">@projectCount @(projectCount == 1 ? "project" : "projects")</span>
+
+                            @if (!isOwnProfile && currentUserId != null)
+                            {
+                                <span>
+                                    @if (status == "none")
+                                    {
+                                        <form asp-controller="Friends" asp-action="SendRequest" method="post" class="m-0">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="receiverId" value="@profile.UserId" />
+                                            <input type="hidden" name="returnUrl" value="/Discover" />
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">+ Add Friend</button>
+                                        </form>
+                                    }
+                                    else if (status == "pending_sent")
+                                    {
+                                        <button class="btn btn-sm btn-outline-secondary" disabled>Pending</button>
+                                    }
+                                    else if (status == "pending_received")
+                                    {
+                                        <a asp-controller="Friends" asp-action="Index" class="btn btn-sm btn-warning"
+                                           href="/Friends#requests">Respond</a>
+                                    }
+                                    else if (status == "friends")
+                                    {
+                                        <a asp-controller="Chat" asp-action="Index" asp-route-friendId="@profile.UserId"
+                                           class="btn btn-sm btn-outline-success">Message</a>
+                                    }
+                                </span>
+                            }
+                        </div>
                     </div>
                 </div>
             }
