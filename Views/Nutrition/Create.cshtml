@@ -21,6 +21,21 @@
         </div>
 
         <div class="mb-3">
+            <label class="form-label fw-medium">Meal type <span class="text-muted fw-normal">(optional)</span></label>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var mt in new[] { "Breakfast", "Lunch", "Dinner", "Snack", "Other" })
+                {
+                    <div>
+                        <input type="radio" class="btn-check" name="mealType"
+                               id="mt-@mt.ToLower()" value="@mt.ToLower()" autocomplete="off" />
+                        <label class="btn btn-sm btn-outline-secondary"
+                               for="mt-@mt.ToLower()" style="border-radius:20px; font-size:0.82rem;">@mt</label>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="mb-3">
             <label class="form-label fw-medium">Upload a photo or PDF <span class="text-muted fw-normal">(optional)</span></label>
             <input type="file" name="file" id="fileInput" class="form-control"
                    accept="image/jpeg,image/png,image/webp,application/pdf"

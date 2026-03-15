@@ -13,7 +13,14 @@
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
             <h2 class="fw-bold mb-0">@Model.Title</h2>
-            <p class="text-muted small mb-0">@Model.CreatedAt.ToString("MMMM d, yyyy · HH:mm")</p>
+            <div class="d-flex align-items-center gap-2">
+                <p class="text-muted small mb-0">@Model.CreatedAt.ToString("MMMM d, yyyy · HH:mm")</p>
+                @if (!string.IsNullOrEmpty(Model.MealType))
+                {
+                    var mtEmoji = Model.MealType switch { "breakfast" => "🌅", "lunch" => "☀️", "dinner" => "🌙", "snack" => "🍎", _ => "🍽️" };
+                    <span style="background:#f3f4f6; color:#555; border-radius:4px; padding:1px 6px; font-size:0.75rem; font-weight:500;">@mtEmoji @(char.ToUpper(Model.MealType[0]) + Model.MealType[1..])</span>
+                }
+            </div>
         </div>
         <a asp-action="Index" class="btn btn-outline-secondary btn-sm" style="border-radius:6px;">← Back</a>
     </div>

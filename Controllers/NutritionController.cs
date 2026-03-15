@@ -41,7 +41,7 @@ public class NutritionController : Controller
 
     // POST /Nutrition/AnalyzeStream — SSE endpoint for streaming Gemini thinking + result
     [HttpPost("Nutrition/AnalyzeStream"), ValidateAntiForgeryToken]
-    public async Task AnalyzeStream(string? title, string? description, IFormFile? file)
+    public async Task AnalyzeStream(string? title, string? mealType, string? description, IFormFile? file)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers["Cache-Control"] = "no-cache";
@@ -126,6 +126,7 @@ public class NutritionController : Controller
             UserId = UserId,
             Title = string.IsNullOrWhiteSpace(title) ? "Nutrition Plan" : title.Trim(),
             InputType = fileData != null ? (mimeType!.StartsWith("image") ? "image" : "pdf") : "text",
+            MealType = string.IsNullOrWhiteSpace(mealType) ? null : mealType.Trim().ToLower(),
             HasFile = fileData != null,
             FileExtension = extension,
             FoodDescription = analysis.FoodDescription,

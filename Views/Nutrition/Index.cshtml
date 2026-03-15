@@ -132,7 +132,14 @@ else
                                 </span>
                             }
                         </div>
-                        <p class="text-muted small mb-1">@plan.CreatedAt.ToString("MMM d, yyyy · HH:mm")</p>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="text-muted small">@plan.CreatedAt.ToString("MMM d, yyyy · HH:mm")</span>
+                            @if (!string.IsNullOrEmpty(plan.MealType))
+                            {
+                                var mtEmoji = plan.MealType switch { "breakfast" => "🌅", "lunch" => "☀️", "dinner" => "🌙", "snack" => "🍎", _ => "🍽️" };
+                                <span style="background:#f3f4f6; color:#555; border-radius:4px; padding:1px 6px; font-size:0.72rem; font-weight:500;">@mtEmoji @(char.ToUpper(plan.MealType[0]) + plan.MealType[1..])</span>
+                            }
+                        </div>
                         @if (plan.CaloriesMin > 0)
                         {
                             <p class="text-muted small mb-2" style="font-size:0.78rem;">🔥 @plan.CaloriesMin–@plan.CaloriesMax kcal</p>

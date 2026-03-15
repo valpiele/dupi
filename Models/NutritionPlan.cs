@@ -7,6 +7,7 @@ public class NutritionPlan
     public string Title { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string InputType { get; set; } = string.Empty; // "image", "pdf", "text"
+    public string? MealType { get; set; } // "breakfast", "lunch", "dinner", "snack", "other"
     public bool HasFile { get; set; }
     public string? FileExtension { get; set; }
     public bool IsPublic { get; set; }
