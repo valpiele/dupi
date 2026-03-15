@@ -37,13 +37,15 @@
                         {
                             <li class="nav-item d-flex align-items-center gap-2">
                                 <span class="navbar-text text-muted small">@User.Identity.Name</span>
-                                <a class="btn btn-sm btn-outline-secondary" asp-controller="Account" asp-action="Logout">Sign out</a>
+                                <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Sign out</button>
+                                </form>
                             </li>
                         }
                         else
                         {
                             <li class="nav-item">
-                                <a class="btn btn-sm btn-outline-primary" asp-controller="Account" asp-action="Login">Sign in with Google</a>
+                                <a class="btn btn-sm btn-outline-primary" asp-controller="Account" asp-action="Login">Sign in</a>
                             </li>
                         }
                     </ul>

@@ -16,7 +16,7 @@ public class ProjectsController : Controller
         _profileService = profileService;
     }
 
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private string UserId => User.FindFirstValue("dupi:uid")!;
 
     public IActionResult Index()
     {

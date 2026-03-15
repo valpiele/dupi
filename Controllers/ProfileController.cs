@@ -15,7 +15,7 @@ public class ProfileController : Controller
         _profileService = profileService;
     }
 
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private string UserId => User.FindFirstValue("dupi:uid")!;
 
     [Authorize]
     public IActionResult Index()
