@@ -90,7 +90,10 @@ public class NutritionController : Controller
                 if (isThinking)
                     await Send(new { type = "thinking", text });
                 else
+                {
                     outputBuffer.Append(text);
+                    await Send(new { type = "output", text });
+                }
             }
         }
         catch (OperationCanceledException)

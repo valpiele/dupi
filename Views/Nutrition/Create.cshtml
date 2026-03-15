@@ -50,10 +50,10 @@
     <div id="thinkingPanel" class="d-none">
         <div class="d-flex align-items-center gap-2 mb-3">
             <span class="spinner-border spinner-border-sm text-muted"></span>
-            <span class="fw-medium text-muted">Gemini is thinking...</span>
+            <span class="fw-medium text-muted" id="thinkingLabel">Gemini is thinking...</span>
         </div>
         <div id="thinkingText"
-             class="border rounded p-3 text-muted small"
+             class="border rounded p-3 small"
              style="max-height:260px; overflow-y:auto; white-space:pre-wrap; background:#f8f9fa; line-height:1.6;"></div>
         <p class="text-muted small mt-2 mb-0">Hang tight — results will appear automatically when done.</p>
     </div>
@@ -68,6 +68,7 @@
     const errorBox   = document.getElementById('errorBox');
     const thinkingPanel = document.getElementById('thinkingPanel');
     const thinkingText  = document.getElementById('thinkingText');
+    const thinkingLabel = document.getElementById('thinkingLabel');
 
     fileInput.addEventListener('change', () => {
         const file = fileInput.files[0];
@@ -121,7 +122,18 @@
                 try { data = JSON.parse(line.slice(6)); } catch { continue; }
 
                 if (data.type === 'thinking') {
-                    thinkingText.textContent += data.text;
+                    const span = document.createElement('span');
+                    span.style.color = '#555';
+                    span.textContent = data.text;
+                    thinkingText.appendChild(span);
+                    thinkingText.scrollTop = thinkingText.scrollHeight;
+                } else if (data.type === 'output') {
+                    const span = document.createElement('span');
+                    span.style.color = '#999';
+                    span.style.fontSize = '0.8em';
+                    span.textContent = data.text;
+                    thinkingText.appendChild(span);
+                    thinkingLabel.textContent = 'Gemini is responding...';
                     thinkingText.scrollTop = thinkingText.scrollHeight;
                 } else if (data.type === 'done') {
                     window.location.href = data.redirectUrl;

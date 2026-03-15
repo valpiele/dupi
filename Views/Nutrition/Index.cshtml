@@ -2,15 +2,18 @@
 @{
     ViewData["Title"] = "Nutrition";
 
-    // Build per-meal score history for chart (last 20 scored meals, oldest first)
-    var scoredMeals = Model
-        .Where(p => p.Score > 0)
-        .OrderBy(p => p.CreatedAt)
-        .TakeLast(20)
-        .ToList();
+    var mealsJson = System.Text.Json.JsonSerializer.Serialize(
+        Model.Where(p => p.Score > 0)
+             .OrderBy(p => p.CreatedAt)
+             .Select(p => new {
+                 score = p.Score,
+                 iso   = p.CreatedAt.ToLocalTime().ToString("o"),
+                 label = p.CreatedAt.ToLocalTime().ToString("MMM d HH:mm"),
+                 title = p.Title
+             })
+    );
 
-    var chartLabels = System.Text.Json.JsonSerializer.Serialize(scoredMeals.Select(p => p.CreatedAt.ToLocalTime().ToString("MMM d HH:mm")));
-    var chartData   = System.Text.Json.JsonSerializer.Serialize(scoredMeals.Select(p => p.Score));
+    bool hasScored = Model.Any(p => p.Score > 0);
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -36,12 +39,26 @@
 }
 else
 {
-    @if (scoredMeals.Any())
+    @if (hasScored)
     {
         <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;">
             <div class="card-body p-3">
-                <div class="fw-semibold small text-muted mb-3">📈 Score History</div>
-                <canvas id="scoreChart" height="90"></canvas>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <span class="fw-semibold small text-muted">📈 Score History</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-dark"         onclick="setMode('meal')" id="btn-meal">Meal</button>
+                            <button type="button" class="btn btn-outline-dark" onclick="setMode('day')"  id="btn-day">Day</button>
+                            <button type="button" class="btn btn-outline-dark" onclick="setMode('week')" id="btn-week">Week</button>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button class="btn btn-outline-secondary btn-sm px-2" id="btnOlder" onclick="changePage(1)" title="Older">‹</button>
+                            <span class="text-muted small" id="pageInfo" style="white-space:nowrap;"></span>
+                            <button class="btn btn-outline-secondary btn-sm px-2" id="btnNewer" onclick="changePage(-1)" title="Newer">›</button>
+                        </div>
+                    </div>
+                </div>
+                <canvas id="scoreChart" height="80"></canvas>
             </div>
         </div>
     }
@@ -92,36 +109,125 @@ else
 }
 
 @section Scripts {
-@if (scoredMeals.Any())
+@if (hasScored)
 {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
-    new Chart(document.getElementById('scoreChart'), {
-        type: 'line',
-        data: {
-            labels: @Html.Raw(chartLabels),
-            datasets: [{
-                label: 'Score',
-                data: @Html.Raw(chartData),
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59,130,246,0.08)',
-                borderWidth: 2,
-                pointBackgroundColor: '#3b82f6',
-                pointRadius: 4,
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            scales: {
-                y: { min: 0, max: 10, ticks: { stepSize: 2 }, grid: { color: '#f3f4f6' } },
-                x: { grid: { display: false } }
-            },
-            plugins: { legend: { display: false } },
-            responsive: true,
-            maintainAspectRatio: true
+const RAW = @Html.Raw(mealsJson);
+const PAGE_SIZE = 100;
+let mode = 'meal';
+let page = 0; // 0 = most recent PAGE_SIZE records
+
+function avg(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+
+function isoWeekKey(iso) {
+    const d = new Date(iso);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+    const jan4 = new Date(d.getFullYear(), 0, 4);
+    const wk = 1 + Math.round(((d - jan4) / 86400000 - 3 + (jan4.getDay() + 6) % 7) / 7);
+    return `${d.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+}
+
+function weekLabel(iso) {
+    const d = new Date(iso);
+    const day = d.getDay();
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    return 'W/o ' + mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function buildGroups() {
+    if (mode === 'meal') {
+        return RAW.map(m => ({ label: m.label, value: m.score }));
+    }
+    const map = new Map();
+    RAW.forEach(m => {
+        let key, label;
+        if (mode === 'day') {
+            key = m.iso.slice(0, 10);
+            const d = new Date(m.iso);
+            label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } else {
+            key = isoWeekKey(m.iso);
+            label = weekLabel(m.iso);
         }
+        if (!map.has(key)) map.set(key, { label, scores: [] });
+        map.get(key).scores.push(m.score);
     });
+    return Array.from(map.values()).map(g => ({
+        label: g.label,
+        value: Math.round(avg(g.scores) * 10) / 10
+    }));
+}
+
+function render() {
+    const groups = buildGroups();
+    const total = groups.length;
+    const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+    page = Math.min(page, maxPage);
+
+    const end = total - page * PAGE_SIZE;
+    const start = Math.max(0, end - PAGE_SIZE);
+    const slice = groups.slice(start, end);
+
+    chart.data.labels = slice.map(g => g.label);
+    chart.data.datasets[0].data = slice.map(g => g.value);
+    chart.update('none');
+
+    const unit = mode === 'meal' ? 'meal' : mode === 'day' ? 'day' : 'week';
+    const units = unit + (total !== 1 ? 's' : '');
+    document.getElementById('pageInfo').textContent =
+        total > PAGE_SIZE ? `${start + 1}–${end} of ${total} ${units}` : `${total} ${units}`;
+
+    document.getElementById('btnOlder').disabled = start <= 0;
+    document.getElementById('btnNewer').disabled = page <= 0;
+}
+
+function setMode(m) {
+    mode = m;
+    page = 0;
+    ['meal', 'day', 'week'].forEach(x => {
+        const btn = document.getElementById('btn-' + x);
+        btn.className = x === m ? 'btn btn-dark' : 'btn btn-outline-dark';
+    });
+    render();
+}
+
+function changePage(dir) {
+    page += dir;
+    render();
+}
+
+const chart = new Chart(document.getElementById('scoreChart'), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Score',
+            data: [],
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.08)',
+            borderWidth: 2,
+            pointBackgroundColor: '#3b82f6',
+            pointRadius: 4,
+            tension: 0.3,
+            fill: true
+        }]
+    },
+    options: {
+        animation: false,
+        scales: {
+            y: { min: 0, max: 10, ticks: { stepSize: 2 }, grid: { color: '#f3f4f6' } },
+            x: { grid: { display: false }, ticks: { maxRotation: 45, maxTicksLimit: 20 } }
+        },
+        plugins: { legend: { display: false } },
+        responsive: true,
+        maintainAspectRatio: true
+    }
+});
+
+render();
 </script>
 }
 }
