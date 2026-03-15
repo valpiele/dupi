@@ -69,14 +69,14 @@ public class NutritionController : Controller
             extension = Path.GetExtension(file.FileName).ToLower();
         }
 
-        string analysis;
+        dupi.Models.NutritionAnalysis analysis;
         try
         {
             analysis = await _geminiService.AnalyzeNutritionAsync(description, fileData, mimeType);
         }
-        catch
+        catch (Exception ex)
         {
-            TempData["Error"] = "Could not analyse your plan right now. Please try again in a moment.";
+            TempData["Error"] = $"Could not analyse your plan right now: {ex.Message}";
             return View();
         }
 
@@ -86,9 +86,18 @@ public class NutritionController : Controller
             Title = string.IsNullOrWhiteSpace(title) ? "Nutrition Plan" : title.Trim(),
             InputType = fileData != null ? (mimeType!.StartsWith("image") ? "image" : "pdf") : "text",
             OriginalFileName = file?.FileName,
-            Analysis = analysis,
             HasFile = fileData != null,
-            FileExtension = extension
+            FileExtension = extension,
+            FoodDescription = analysis.FoodDescription,
+            CaloriesMin = analysis.CaloriesMin,
+            CaloriesMax = analysis.CaloriesMax,
+            Proteins = analysis.Proteins,
+            Carbohydrates = analysis.Carbohydrates,
+            Fats = analysis.Fats,
+            WhatsGood = analysis.WhatsGood,
+            WhatToImprove = analysis.WhatToImprove,
+            Score = analysis.Score,
+            ScoreSummary = analysis.ScoreSummary
         };
 
         _nutritionService.SavePlan(plan);

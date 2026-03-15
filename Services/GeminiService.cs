@@ -1,5 +1,5 @@
+using dupi.Models;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 
 namespace dupi.Services;
@@ -17,7 +17,7 @@ public class GeminiService
             ?? throw new InvalidOperationException("Gemini:ApiKey is not configured.");
     }
 
-    public async Task<string> AnalyzeNutritionAsync(string? userText, byte[]? fileData, string? mimeType)
+    public async Task<NutritionAnalysis> AnalyzeNutritionAsync(string? userText, byte[]? fileData, string? mimeType)
     {
         var parts = new List<object>();
 
@@ -37,7 +37,29 @@ public class GeminiService
 
         var body = new
         {
-            contents = new[] { new { parts = parts.ToArray() } }
+            contents = new[] { new { parts = parts.ToArray() } },
+            generationConfig = new
+            {
+                responseMimeType = "application/json",
+                responseSchema = new
+                {
+                    type = "OBJECT",
+                    properties = new
+                    {
+                        food_description = new { type = "STRING", description = "Brief description of the food/meal observed" },
+                        calories_min = new { type = "INTEGER", description = "Lower bound of estimated calorie range" },
+                        calories_max = new { type = "INTEGER", description = "Upper bound of estimated calorie range" },
+                        proteins = new { type = "NUMBER", description = "Estimated protein content in grams" },
+                        carbohydrates = new { type = "NUMBER", description = "Estimated carbohydrate content in grams" },
+                        fats = new { type = "NUMBER", description = "Estimated fat content in grams" },
+                        whats_good = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 positive aspects of the meal" },
+                        what_to_improve = new { type = "ARRAY", items = new { type = "STRING" }, description = "2-3 specific actionable improvement suggestions" },
+                        score = new { type = "INTEGER", description = "Overall nutritional score from 1 to 10" },
+                        score_summary = new { type = "STRING", description = "One sentence explaining the score" }
+                    },
+                    required = new[] { "food_description", "calories_min", "calories_max", "proteins", "carbohydrates", "fats", "whats_good", "what_to_improve", "score", "score_summary" }
+                }
+            }
         };
 
         var url = string.Format(Endpoint, _apiKey);
@@ -49,44 +71,29 @@ public class GeminiService
         }
 
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return json
+        var text = json
             .GetProperty("candidates")[0]
             .GetProperty("content")
             .GetProperty("parts")[0]
             .GetProperty("text")
-            .GetString() ?? "No analysis available.";
+            .GetString() ?? "{}";
+
+        return JsonSerializer.Deserialize<NutritionAnalysis>(text)
+            ?? throw new InvalidOperationException("Could not parse Gemini structured response.");
     }
 
     private static string BuildPrompt(string? userText)
     {
-        var sb = new StringBuilder();
+        var sb = new System.Text.StringBuilder();
         sb.AppendLine("You are a professional nutritionist and health coach.");
-        sb.AppendLine("Analyze the meal or nutrition plan provided (image and/or text description) and give a detailed, friendly response.");
-        sb.AppendLine("If analyzing an image of food, start by briefly describing what you see.");
-        sb.AppendLine();
-        sb.AppendLine("Structure your response exactly like this:");
-        sb.AppendLine();
-        sb.AppendLine("## 🔥 Estimated Calories");
-        sb.AppendLine("(total estimate — give a range if unsure)");
-        sb.AppendLine();
-        sb.AppendLine("## 📊 Macronutrients");
-        sb.AppendLine("- **Proteins:** X g");
-        sb.AppendLine("- **Carbohydrates:** X g");
-        sb.AppendLine("- **Fats:** X g");
-        sb.AppendLine();
-        sb.AppendLine("## ✅ What's Good");
-        sb.AppendLine("(2-3 positive aspects)");
-        sb.AppendLine();
-        sb.AppendLine("## 💡 What to Improve");
-        sb.AppendLine("(2-3 specific, actionable suggestions)");
-        sb.AppendLine();
-        sb.AppendLine("## ⭐ Overall Score: X/10");
-        sb.AppendLine("(one sentence explanation)");
+        sb.AppendLine("Analyze the meal or nutrition plan provided (image and/or text description).");
+        sb.AppendLine("Return accurate nutritional estimates. For calories, provide a realistic min/max range.");
+        sb.AppendLine("Score the meal from 1 (very unhealthy) to 10 (excellent nutrition).");
+        sb.AppendLine("Be specific and actionable in your improvement suggestions.");
 
         if (!string.IsNullOrWhiteSpace(userText))
         {
             sb.AppendLine();
-            sb.AppendLine("---");
             sb.AppendLine("User's description:");
             sb.AppendLine(userText);
         }
