@@ -1,14 +1,25 @@
+@using dupi.Models
 @model dupi.Models.ChallengeCreateViewModel
 @{
     ViewData["Title"] = "Create Challenge";
     var friends = ViewBag.Friends as List<(dupi.Models.Friendship F, dupi.Models.UserProfile? Profile)> ?? new();
+
+    // Build metric config JSON for JS
+    var metrics = Enum.GetValues<ChallengeMetric>().Select(m =>
+    {
+        var (name, unit, emoji) = ChallengeMetricHelper.GetInfo(m);
+        var (def, min, max, step) = ChallengeMetricHelper.GetRange(m);
+        var dir = ChallengeMetricHelper.DefaultDirection(m);
+        return new { value = m.ToString(), name, unit, emoji, def, min, max, step, direction = dir.ToString() };
+    });
+    var metricsJson = System.Text.Json.JsonSerializer.Serialize(metrics);
 }
 
 <div style="max-width:560px; margin:0 auto;" class="mt-4">
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
             <h2 class="fw-bold mb-1">Create Challenge</h2>
-            <p class="text-muted small mb-0">Set up a 7-day high protein challenge.</p>
+            <p class="text-muted small mb-0">Set up a 7-day nutrition challenge.</p>
         </div>
         <a asp-action="Index" class="btn btn-outline-secondary btn-sm" style="border-radius:6px;">← Back</a>
     </div>
@@ -24,19 +35,57 @@
         <div class="mb-3">
             <label class="form-label fw-semibold small">Title</label>
             <input type="text" name="Title" class="form-control" value="@Model.Title"
-                   placeholder="e.g. Protein Power Week" maxlength="100" required
+                   placeholder="e.g. Protein Power Week, Low Sugar Challenge" maxlength="100" required
                    style="border-radius:8px;" />
         </div>
 
         <div class="mb-3">
-            <label class="form-label fw-semibold small">Daily Protein Target (grams)</label>
-            <div class="d-flex align-items-center gap-3">
-                <input type="range" name="ProteinTargetGrams" id="proteinSlider"
-                       min="10" max="300" step="5" value="@Model.ProteinTargetGrams"
-                       class="form-range flex-grow-1" oninput="document.getElementById('proteinVal').textContent = this.value + 'g'" />
-                <span id="proteinVal" class="fw-bold" style="min-width:50px;">@(Model.ProteinTargetGrams)g</span>
+            <label class="form-label fw-semibold small">Metric</label>
+            <div class="d-flex flex-wrap gap-2" id="metricSelector">
+                @foreach (var m in Enum.GetValues<ChallengeMetric>())
+                {
+                    var (name, unit, emoji) = ChallengeMetricHelper.GetInfo(m);
+                    var isSelected = m == Model.Metric;
+                    <label class="metric-option card text-center py-2 px-3" style="cursor:pointer; border-radius:10px; min-width:80px;"
+                           data-metric="@m.ToString()">
+                        <input type="radio" name="Metric" value="@m.ToString()" class="d-none"
+                               @(isSelected ? "checked" : "") onchange="onMetricChange()" />
+                        <div style="font-size:1.2rem;">@emoji</div>
+                        <div class="small fw-medium">@name</div>
+                    </label>
+                }
             </div>
-            <div class="text-muted small mt-1">Typical: 1.6–2.2g per kg of body weight. Default is 120g.</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold small">
+                Daily Target: <span id="targetDisplay" class="text-primary"></span>
+            </label>
+            <input type="range" name="TargetValue" id="targetSlider"
+                   value="@Model.TargetValue"
+                   class="form-range" oninput="updateTargetDisplay()" />
+            <div class="d-flex justify-content-between text-muted" style="font-size:0.72rem;">
+                <span id="rangeMin"></span>
+                <span id="rangeMax"></span>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold small">Goal Direction</label>
+            <div class="d-flex gap-2">
+                <label class="card flex-fill text-center py-2 px-2" style="cursor:pointer; border-radius:10px;" id="label-atleast">
+                    <input type="radio" name="Direction" value="AtLeast" class="d-none" id="dir-atleast"
+                           @(Model.Direction == GoalDirection.AtLeast ? "checked" : "") onchange="updateDirectionUI()" />
+                    <div class="fw-semibold small">At Least</div>
+                    <div class="text-muted" style="font-size:0.72rem;">Hit or exceed the target</div>
+                </label>
+                <label class="card flex-fill text-center py-2 px-2" style="cursor:pointer; border-radius:10px;" id="label-atmost">
+                    <input type="radio" name="Direction" value="AtMost" class="d-none" id="dir-atmost"
+                           @(Model.Direction == GoalDirection.AtMost ? "checked" : "") onchange="updateDirectionUI()" />
+                    <div class="fw-semibold small">At Most</div>
+                    <div class="text-muted" style="font-size:0.72rem;">Stay at or below the target</div>
+                </label>
+            </div>
         </div>
 
         <div class="mb-3">
@@ -44,20 +93,20 @@
             <div class="d-flex gap-2">
                 <label class="card flex-fill text-center py-3 px-2" style="cursor:pointer; border-radius:10px;" id="label-friend">
                     <input type="radio" name="Type" value="FriendChallenge" class="d-none" id="type-friend"
-                           @(Model.Type == dupi.Models.ChallengeType.FriendChallenge ? "checked" : "") onchange="updateType()" />
+                           @(Model.Type == ChallengeType.FriendChallenge ? "checked" : "") onchange="updateType()" />
                     <div class="fw-semibold small">Friend Challenge</div>
                     <div class="text-muted" style="font-size:0.75rem;">Invite specific friends</div>
                 </label>
                 <label class="card flex-fill text-center py-3 px-2" style="cursor:pointer; border-radius:10px;" id="label-community">
                     <input type="radio" name="Type" value="Community" class="d-none" id="type-community"
-                           @(Model.Type == dupi.Models.ChallengeType.Community ? "checked" : "") onchange="updateType()" />
+                           @(Model.Type == ChallengeType.Community ? "checked" : "") onchange="updateType()" />
                     <div class="fw-semibold small">Community</div>
                     <div class="text-muted" style="font-size:0.75rem;">Open for anyone to join</div>
                 </label>
             </div>
         </div>
 
-        <div id="friendSelector" class="mb-3" style="@(Model.Type == dupi.Models.ChallengeType.Community ? "display:none" : "")">
+        <div id="friendSelector" class="mb-3" style="@(Model.Type == ChallengeType.Community ? "display:none" : "")">
             <label class="form-label fw-semibold small">Invite Friends</label>
             @if (!friends.Any())
             {
@@ -97,15 +146,66 @@
 
 @section Scripts {
 <script>
+const METRICS = @Html.Raw(metricsJson);
+const metricMap = Object.fromEntries(METRICS.map(m => [m.value, m]));
+
+function getSelectedMetric() {
+    const checked = document.querySelector('input[name="Metric"]:checked');
+    return checked ? metricMap[checked.value] : METRICS[0];
+}
+
+function onMetricChange() {
+    const m = getSelectedMetric();
+    const slider = document.getElementById('targetSlider');
+    slider.min = m.min;
+    slider.max = m.max;
+    slider.step = m.step;
+    slider.value = m.def;
+
+    // Set default direction
+    document.getElementById(m.direction === 'AtMost' ? 'dir-atmost' : 'dir-atleast').checked = true;
+
+    updateTargetDisplay();
+    updateDirectionUI();
+    updateMetricUI();
+}
+
+function updateTargetDisplay() {
+    const m = getSelectedMetric();
+    const val = document.getElementById('targetSlider').value;
+    document.getElementById('targetDisplay').textContent = val + m.unit;
+    document.getElementById('rangeMin').textContent = m.min + m.unit;
+    document.getElementById('rangeMax').textContent = m.max + m.unit;
+}
+
+function updateMetricUI() {
+    const selected = document.querySelector('input[name="Metric"]:checked')?.value;
+    document.querySelectorAll('.metric-option').forEach(el => {
+        const isActive = el.dataset.metric === selected;
+        el.style.borderColor = isActive ? '#1a1a1a' : '#dee2e6';
+        el.style.borderWidth = isActive ? '2px' : '1px';
+    });
+}
+
+function updateDirectionUI() {
+    const isAtLeast = document.getElementById('dir-atleast').checked;
+    document.getElementById('label-atleast').style.borderColor = isAtLeast ? '#1a1a1a' : '#dee2e6';
+    document.getElementById('label-atleast').style.borderWidth = isAtLeast ? '2px' : '1px';
+    document.getElementById('label-atmost').style.borderColor = !isAtLeast ? '#1a1a1a' : '#dee2e6';
+    document.getElementById('label-atmost').style.borderWidth = !isAtLeast ? '2px' : '1px';
+}
+
 function updateType() {
     const isFriend = document.getElementById('type-friend').checked;
     document.getElementById('friendSelector').style.display = isFriend ? '' : 'none';
-
     document.getElementById('label-friend').style.borderColor = isFriend ? '#1a1a1a' : '#dee2e6';
     document.getElementById('label-friend').style.borderWidth = isFriend ? '2px' : '1px';
     document.getElementById('label-community').style.borderColor = !isFriend ? '#1a1a1a' : '#dee2e6';
     document.getElementById('label-community').style.borderWidth = !isFriend ? '2px' : '1px';
 }
+
+// Init
+onMetricChange();
 updateType();
 </script>
 }
