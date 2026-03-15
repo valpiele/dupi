@@ -17,12 +17,14 @@ public class DiscoverController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var profiles = _profileService.GetAllPublicProfiles();
-
         var userId = User.FindFirstValue("dupi:uid");
+        var profiles = _profileService.GetAllPublicProfiles()
+            .Where(p => p.Profile.UserId != userId)
+            .ToList();
+
         if (!string.IsNullOrEmpty(userId))
         {
-            var ids = profiles.Select(p => p.Profile.UserId).Where(id => id != userId);
+            var ids = profiles.Select(p => p.Profile.UserId);
             ViewBag.FriendStatuses = await _socialService.GetStatusesAsync(userId, ids);
             ViewBag.CurrentUserId = userId;
         }
