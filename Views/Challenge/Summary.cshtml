@@ -1,0 +1,149 @@
+@{
+    ViewData["Title"] = "Challenge Summary";
+    var challenge = ViewBag.Challenge as dupi.Models.Challenge;
+}
+
+<div style="max-width:640px; margin: 0 auto;">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Challenge Summary</h2>
+            <p class="text-muted small mb-0">AI-powered analysis of "@challenge?.Title"</p>
+        </div>
+        <a asp-action="Dashboard" asp-route-id="@challenge?.Id" class="btn btn-outline-secondary btn-sm" style="border-radius:6px;">← Dashboard</a>
+    </div>
+
+    @Html.AntiForgeryToken()
+    <div id="errorBox" class="alert alert-danger d-none"></div>
+
+    <!-- Loading state -->
+    <div id="loadingPanel" class="text-center py-5">
+        <div class="spinner-border text-secondary mb-3" style="width:2rem;height:2rem;"></div>
+        <p class="fw-semibold mb-1">Generating summary...</p>
+        <p class="text-muted small mb-4">Gemini is reviewing the challenge results</p>
+
+        <div id="reasoningBlock" class="d-none text-start mt-2">
+            <p class="text-muted small fw-medium mb-1" style="letter-spacing:.03em;">GEMINI'S REASONING</p>
+            <div id="thinkingText"
+                 class="border-start border-2 ps-3 text-muted small"
+                 style="max-height:220px; overflow-y:auto; white-space:pre-wrap; line-height:1.7;"></div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div id="resultsPanel" class="d-none">
+        <div class="card border mb-3" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-2">Winner Analysis</div>
+                <p id="winnerAnalysis" class="mb-0" style="font-size:0.92rem; line-height:1.5;"></p>
+            </div>
+        </div>
+
+        <div class="card border mb-3" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-2">Highlights</div>
+                <ul id="highlightsList" class="mb-0" style="padding-left:1.25rem;"></ul>
+            </div>
+        </div>
+
+        <div class="card border mb-3" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-2">Improvement Tips</div>
+                <ul id="tipsList" class="mb-0" style="padding-left:1.25rem;"></ul>
+            </div>
+        </div>
+
+        <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-2">Fun Stats</div>
+                <ul id="funStatsList" class="mb-0" style="padding-left:1.25rem;"></ul>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a asp-action="Dashboard" asp-route-id="@challenge?.Id" class="btn btn-dark btn-sm px-3" style="border-radius:6px;">Back to Dashboard</a>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm px-3" style="border-radius:6px;">All Challenges</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(async () => {
+    const loadingPanel   = document.getElementById('loadingPanel');
+    const resultsPanel   = document.getElementById('resultsPanel');
+    const errorBox       = document.getElementById('errorBox');
+    const thinkingText   = document.getElementById('thinkingText');
+    const reasoningBlock = document.getElementById('reasoningBlock');
+
+    function showError(msg) {
+        loadingPanel.classList.add('d-none');
+        errorBox.textContent = msg;
+        errorBox.classList.remove('d-none');
+    }
+
+    function renderResults(summary) {
+        document.getElementById('winnerAnalysis').textContent =
+            summary.winner_analysis ?? summary.WinnerAnalysis ?? '';
+
+        const fillList = (id, items) => {
+            const ul = document.getElementById(id);
+            (items || []).forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'text-muted small mb-1';
+                li.textContent = item;
+                ul.appendChild(li);
+            });
+        };
+
+        fillList('highlightsList', summary.highlights ?? summary.Highlights ?? []);
+        fillList('tipsList',       summary.improvement_tips ?? summary.ImprovementTips ?? []);
+        fillList('funStatsList',   summary.fun_stats ?? summary.FunStats ?? []);
+
+        loadingPanel.classList.add('d-none');
+        resultsPanel.classList.remove('d-none');
+    }
+
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+
+    let response;
+    try {
+        const fd = new FormData();
+        fd.append('__RequestVerificationToken', token);
+        response = await fetch('/Challenge/SummaryStream/@challenge?.Id', { method: 'POST', body: fd });
+    } catch {
+        showError('Network error. Please try again.');
+        return;
+    }
+
+    if (!response.ok) { showError('Server error. Please try again.'); return; }
+
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            let data;
+            try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+            if (data.type === 'thinking') {
+                reasoningBlock.classList.remove('d-none');
+                thinkingText.textContent += data.text;
+                thinkingText.scrollTop = thinkingText.scrollHeight;
+            } else if (data.type === 'done') {
+                renderResults(data.summary);
+            } else if (data.type === 'error') {
+                showError(data.message);
+            }
+        }
+    }
+})();
+</script>
+}

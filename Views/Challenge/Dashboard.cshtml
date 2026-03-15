@@ -1,0 +1,208 @@
+@model dupi.Models.ChallengeDashboardViewModel
+@{
+    ViewData["Title"] = Model.Challenge.Title;
+    var challenge = Model.Challenge;
+    var today = DateTime.UtcNow.Date;
+    var dayNum = Math.Clamp((int)(today - challenge.StartDate.Date).TotalDays + 1, 1, 7);
+    var currentUserId = ViewContext.HttpContext.User.FindFirst("dupi:uid")?.Value;
+    var statusColor = challenge.Status == dupi.Models.ChallengeStatus.Active ? "bg-success"
+                    : challenge.Status == dupi.Models.ChallengeStatus.Completed ? "bg-secondary" : "bg-warning";
+}
+
+<div class="container mt-4" style="max-width:860px;">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">@challenge.Title</h2>
+            <div class="text-muted small d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge @statusColor">@challenge.Status</span>
+                <span>@challenge.StartDate.ToString("MMM d") – @challenge.EndDate.ToString("MMM d")</span>
+                @if (challenge.Status == dupi.Models.ChallengeStatus.Active)
+                {
+                    <span class="fw-semibold">Day @dayNum of 7</span>
+                }
+                <span>@challenge.ProteinTargetGrams g protein/day</span>
+                <span>@Model.Leaderboard.Count participant@(Model.Leaderboard.Count != 1 ? "s" : "")</span>
+            </div>
+            @if (!string.IsNullOrEmpty(challenge.Description))
+            {
+                <p class="text-muted small mt-1 mb-0">@challenge.Description</p>
+            }
+        </div>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm" style="border-radius:6px;">← Back</a>
+    </div>
+
+    @if (!Model.IsParticipant && challenge.Status == dupi.Models.ChallengeStatus.Active)
+    {
+        <div class="alert alert-info d-flex align-items-center justify-content-between">
+            <span>You're not in this challenge yet.</span>
+            <form asp-action="Join" asp-route-id="@challenge.Id" method="post" class="m-0">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-dark">Join Challenge</button>
+            </form>
+        </div>
+    }
+
+    @* ── My Daily Progress ── *@
+    @if (Model.MyProgress != null)
+    {
+        <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-3">My Progress</div>
+                <div class="row g-2">
+                    @foreach (var day in Model.MyProgress.DailyBreakdown)
+                    {
+                        var isFuture = day.Date > today;
+                        var pct = challenge.ProteinTargetGrams > 0 ? Math.Min(100, day.ProteinGrams / challenge.ProteinTargetGrams * 100) : 0;
+                        var barColor = day.TargetHit ? "#22c55e" : "#ef4444";
+                        var dayLabel = day.Date.ToString("ddd");
+                        var dateLabel = day.Date.ToString("MMM d");
+                        <div class="col">
+                            <div class="text-center">
+                                <div class="small fw-medium">@dayLabel</div>
+                                <div class="text-muted" style="font-size:0.7rem;">@dateLabel</div>
+                                <div class="mt-1" style="height:60px; position:relative; background:#f3f4f6; border-radius:4px; overflow:hidden;">
+                                    @if (!isFuture)
+                                    {
+                                        <div style="position:absolute; bottom:0; width:100%; height:@pct.ToString("0")%; background:@barColor; border-radius:4px; transition: height 0.3s;"></div>
+                                    }
+                                </div>
+                                <div class="mt-1" style="font-size:0.72rem;">
+                                    @if (isFuture)
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                    else if (day.TargetHit)
+                                    {
+                                        <span style="color:#22c55e; font-weight:600;">@day.ProteinGrams.ToString("0")g</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:#ef4444;">@day.ProteinGrams.ToString("0")g</span>
+                                    }
+                                </div>
+                                <div style="font-size:0.65rem;" class="text-muted">
+                                    @if (!isFuture)
+                                    {
+                                        @:@day.MealCount meal@(day.MealCount != 1 ? "s" : "")
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="text-muted small mt-2 text-center">
+                    Target: @challenge.ProteinTargetGrams g/day &middot;
+                    Days hit: @Model.MyProgress.DaysHit/7 &middot;
+                    Total: @Model.MyProgress.TotalProtein.ToString("0")g protein
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ── Leaderboard ── *@
+    <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;" id="leaderboardCard">
+        <div class="card-body p-3">
+            <div class="fw-semibold small mb-3">Leaderboard</div>
+            @if (!Model.Leaderboard.Any())
+            {
+                <p class="text-muted text-center py-3">No participants yet.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead>
+                            <tr class="text-muted small">
+                                <th style="width:40px;">#</th>
+                                <th>Participant</th>
+                                <th class="text-center" style="min-width:120px;">Daily Progress</th>
+                                <th class="text-center">Days Hit</th>
+                                <th class="text-end">Total Protein</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Model.Leaderboard)
+                            {
+                                var name = p.Profile?.DisplayName ?? "Unknown";
+                                var isMe = p.UserId == currentUserId;
+                                var medal = p.Rank switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => p.Rank.ToString() };
+                                <tr style="@(isMe ? "background:#f0f9ff;" : "")">
+                                    <td class="fw-bold">@Html.Raw(medal)</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                                                 style="width:30px; height:30px; font-size:0.75rem;">
+                                                @name.FirstOrDefault().ToString().ToUpper()
+                                            </div>
+                                            <span class="small fw-medium @(isMe ? "fw-bold" : "")">@name @(isMe ? "(you)" : "")</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex justify-content-center gap-1">
+                                            @foreach (var day in p.DailyBreakdown)
+                                            {
+                                                var isFuture = day.Date > today;
+                                                var dotColor = isFuture ? "#d1d5db" : (day.TargetHit ? "#22c55e" : "#ef4444");
+                                                <div style="width:12px; height:12px; border-radius:50%; background:@dotColor;" title="@day.Date.ToString("MMM d"): @day.ProteinGrams.ToString("0")g"></div>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td class="text-center small fw-semibold">@p.DaysHit/7</td>
+                                    <td class="text-end small">@p.TotalProtein.ToString("0")g</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── Actions ── *@
+    <div class="d-flex gap-2 mb-4">
+        @if (challenge.Status == dupi.Models.ChallengeStatus.Completed && Model.IsParticipant)
+        {
+            <a asp-action="Summary" asp-route-id="@challenge.Id" class="btn btn-dark btn-sm px-3" style="border-radius:6px;">Generate AI Summary</a>
+        }
+        @if (Model.IsCreator && challenge.Status == dupi.Models.ChallengeStatus.Pending)
+        {
+            <form asp-action="Delete" asp-route-id="@challenge.Id" method="post" class="m-0"
+                  onsubmit="return confirm('Delete this challenge?')">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:6px;">Delete Challenge</button>
+            </form>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script>
+    @if (challenge.Status == dupi.Models.ChallengeStatus.Active && Model.IsParticipant)
+    {
+        @:const challengeId = @challenge.Id;
+
+        @:const connection = new signalR.HubConnectionBuilder()
+        @:    .withUrl('/chatHub')
+        @:    .withAutomaticReconnect()
+        @:    .build();
+
+        @:connection.on('ChallengeUpdate', function(data) {
+        @:    if (data.challengeId === challengeId) {
+        @:        refreshLeaderboard();
+        @:    }
+        @:});
+
+        @:connection.start().catch(function(err) { console.error(err); });
+
+        @:async function refreshLeaderboard() {
+        @:    try {
+        @:        const resp = await fetch('/Challenge/LeaderboardData/' + challengeId);
+        @:        if (!resp.ok) return;
+        @:        // Simple reload for now
+        @:        location.reload();
+        @:    } catch(e) { console.error(e); }
+        @:}
+    }
+</script>
+}

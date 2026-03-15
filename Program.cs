@@ -71,6 +71,7 @@ builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<NutritionService>();
 builder.Services.AddScoped<SocialService>();
 builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<ChallengeService>();
 builder.Services.AddHttpClient<GeminiService>(c => c.Timeout = TimeSpan.FromMinutes(5));
 
 var app = builder.Build();
