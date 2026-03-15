@@ -26,9 +26,9 @@ public class NutritionController : Controller
     private string UserId => User.FindFirstValue("dupi:uid")!;
 
     // GET /Nutrition
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
-        var plans = _nutritionService.GetPlans(UserId);
+        var plans = await _nutritionService.GetPlansAsync(UserId);
         return View(plans);
     }
 
@@ -137,7 +137,7 @@ public class NutritionController : Controller
             ScoreSummary = analysis.ScoreSummary
         };
 
-        _nutritionService.SavePlan(plan);
+        await _nutritionService.SavePlanAsync(plan);
 
         if (fileData != null && extension != null)
         {
@@ -149,17 +149,17 @@ public class NutritionController : Controller
     }
 
     // GET /Nutrition/Result/{id}
-    public IActionResult Result(string id)
+    public async Task<IActionResult> Result(string id)
     {
-        var plan = _nutritionService.GetPlan(UserId, id);
+        var plan = await _nutritionService.GetPlanAsync(UserId, id);
         if (plan == null) return NotFound();
         return View(plan);
     }
 
     // GET /Nutrition/File/{id}
-    public IActionResult File(string id)
+    public async Task<IActionResult> File(string id)
     {
-        var plan = _nutritionService.GetPlan(UserId, id);
+        var plan = await _nutritionService.GetPlanAsync(UserId, id);
         if (plan == null || !plan.HasFile || plan.FileExtension == null) return NotFound();
 
         var stream = _nutritionService.GetFile(UserId, id, plan.FileExtension);
@@ -171,11 +171,9 @@ public class NutritionController : Controller
 
     // POST /Nutrition/Delete
     [HttpPost, ValidateAntiForgeryToken]
-    public IActionResult Delete(string id)
+    public async Task<IActionResult> Delete(string id)
     {
-        var plan = _nutritionService.GetPlan(UserId, id);
-        if (plan != null)
-            _nutritionService.DeletePlan(UserId, id, plan.FileExtension);
+        await _nutritionService.DeletePlanAsync(UserId, id);
         return RedirectToAction(nameof(Index));
     }
 }

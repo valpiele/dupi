@@ -1,46 +1,41 @@
-using System.Text.Json;
 using Azure.Storage.Blobs;
+using dupi.Data;
 using dupi.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace dupi.Services;
 
 public class NutritionService
 {
+    private readonly ApplicationDbContext _db;
     private readonly BlobContainerClient _container;
 
-    public NutritionService(IConfiguration config)
+    public NutritionService(ApplicationDbContext db, IConfiguration config)
     {
+        _db = db;
         var connectionString = config["Azure:StorageConnectionString"]!;
         _container = new BlobContainerClient(connectionString, "uploads");
         try { _container.CreateIfNotExists(); } catch { }
     }
 
-    public List<NutritionPlan> GetPlans(string userId)
-    {
-        var plans = new List<NutritionPlan>();
-        foreach (var blob in _container.GetBlobs(prefix: $"{userId}/nutrition/"))
-        {
-            if (!blob.Name.EndsWith(".json")) continue;
-            var content = _container.GetBlobClient(blob.Name).DownloadContent().Value.Content.ToString();
-            var plan = JsonSerializer.Deserialize<NutritionPlan>(content);
-            if (plan != null) plans.Add(plan);
-        }
-        return plans.OrderByDescending(p => p.CreatedAt).ToList();
-    }
+    public Task<List<NutritionPlan>> GetPlansAsync(string userId) =>
+        _db.NutritionPlans
+            .Where(p => p.UserId == userId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
 
-    public NutritionPlan? GetPlan(string userId, string planId)
-    {
-        var blob = _container.GetBlobClient($"{userId}/nutrition/{planId}.json");
-        if (!blob.Exists()) return null;
-        var content = blob.DownloadContent().Value.Content.ToString();
-        return JsonSerializer.Deserialize<NutritionPlan>(content);
-    }
+    public Task<NutritionPlan?> GetPlanAsync(string userId, string planId) =>
+        _db.NutritionPlans
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Id == planId);
 
-    public void SavePlan(NutritionPlan plan)
+    public async Task SavePlanAsync(NutritionPlan plan)
     {
-        var json = JsonSerializer.Serialize(plan);
-        var blob = _container.GetBlobClient($"{plan.UserId}/nutrition/{plan.Id}.json");
-        blob.Upload(BinaryData.FromString(json), overwrite: true);
+        var existing = await _db.NutritionPlans.FindAsync(plan.Id);
+        if (existing == null)
+            _db.NutritionPlans.Add(plan);
+        else
+            _db.Entry(existing).CurrentValues.SetValues(plan);
+        await _db.SaveChangesAsync();
     }
 
     public async Task SaveFileAsync(string userId, string planId, string extension, Stream content)
@@ -56,9 +51,16 @@ public class NutritionService
         return blob.DownloadStreaming().Value.Content;
     }
 
-    public void DeletePlan(string userId, string planId, string? fileExtension)
+    public async Task DeletePlanAsync(string userId, string planId)
     {
-        _container.GetBlobClient($"{userId}/nutrition/{planId}.json").DeleteIfExists();
+        var plan = await _db.NutritionPlans
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Id == planId);
+        if (plan == null) return;
+
+        var fileExtension = plan.FileExtension;
+        _db.NutritionPlans.Remove(plan);
+        await _db.SaveChangesAsync();
+
         if (!string.IsNullOrEmpty(fileExtension))
             _container.GetBlobClient($"{userId}/nutrition/{planId}{fileExtension}").DeleteIfExists();
     }
