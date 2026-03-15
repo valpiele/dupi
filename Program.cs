@@ -1,5 +1,6 @@
 using dupi.Data;
 using dupi.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -59,6 +60,9 @@ builder.Services.AddAuthentication()
         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
         options.SignInScheme = IdentityConstants.ExternalScheme;
     });
+
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<ApplicationDbContext>();
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<ProfileService>();

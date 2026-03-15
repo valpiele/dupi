@@ -8,7 +8,7 @@ public class GeminiService
 {
     private readonly HttpClient _http;
     private readonly string _apiKey;
-    private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={0}";
+    private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={0}";
 
     public GeminiService(HttpClient http, IConfiguration config)
     {
@@ -42,7 +42,11 @@ public class GeminiService
 
         var url = string.Format(Endpoint, _apiKey);
         var response = await _http.PostAsJsonAsync(url, body);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
+        }
 
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         return json
