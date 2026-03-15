@@ -1,0 +1,170 @@
+@{
+    ViewData["Title"] = "Weekly Review";
+}
+
+<div style="max-width:640px; margin: 0 auto;">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Weekly Review</h2>
+            <p class="text-muted small mb-0">AI-powered analysis of your last 7 days of eating.</p>
+        </div>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm" style="border-radius:6px;">← Back</a>
+    </div>
+
+    @Html.AntiForgeryToken()
+    <div id="errorBox" class="alert alert-danger d-none"></div>
+
+    <!-- Loading state -->
+    <div id="loadingPanel" class="text-center py-5">
+        <div class="spinner-border text-secondary mb-3" style="width:2rem;height:2rem;"></div>
+        <p class="fw-semibold mb-1">Analysing your week...</p>
+        <p class="text-muted small mb-4">Gemini is reviewing your nutrition history</p>
+
+        <div id="reasoningBlock" class="d-none text-start mt-2">
+            <p class="text-muted small fw-medium mb-1" style="letter-spacing:.03em;">GEMINI'S REASONING</p>
+            <div id="thinkingText"
+                 class="border-start border-2 ps-3 text-muted small"
+                 style="max-height:220px; overflow-y:auto; white-space:pre-wrap; line-height:1.7;"></div>
+        </div>
+    </div>
+
+    <!-- Results — rendered once done arrives -->
+    <div id="resultsPanel" class="d-none">
+        <!-- Score card -->
+        <div class="row g-3 mb-3">
+            <div class="col-5 col-sm-4">
+                <div class="card h-100 border-0 text-center" id="scoreCard" style="border-radius:12px; padding:1.25rem 0;">
+                    <div id="scoreVal" style="font-size:2.8rem; font-weight:800; line-height:1;"></div>
+                    <div style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; opacity:.8;">/ 10</div>
+                    <div class="text-muted mt-1" style="font-size:0.75rem;">Week score</div>
+                </div>
+            </div>
+            <div class="col-7 col-sm-8">
+                <div class="card h-100 border" style="border-radius:12px; border-color:#eee !important; padding:1.25rem;">
+                    <div class="text-muted small mb-1 fw-semibold">This week</div>
+                    <p id="overallSummary" class="mb-0" style="font-size:0.92rem; line-height:1.5;"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border mb-3" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-2">✅ What went well</div>
+                <ul id="wentWellList" class="mb-0" style="padding-left:1.25rem;"></ul>
+            </div>
+        </div>
+
+        <div class="card border mb-3" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-2">💡 Areas to improve</div>
+                <ul id="toImproveList" class="mb-0" style="padding-left:1.25rem;"></ul>
+            </div>
+        </div>
+
+        <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;">
+            <div class="card-body p-3">
+                <div class="fw-semibold small mb-2">🎯 Goals for next week</div>
+                <ul id="nextWeekList" class="mb-0" style="padding-left:1.25rem;"></ul>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a asp-action="Create" class="btn btn-dark btn-sm px-3" style="border-radius:6px;">+ Log a meal</a>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm px-3" style="border-radius:6px;">Back to history</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(async () => {
+    const loadingPanel  = document.getElementById('loadingPanel');
+    const resultsPanel  = document.getElementById('resultsPanel');
+    const errorBox      = document.getElementById('errorBox');
+    const thinkingText  = document.getElementById('thinkingText');
+    const reasoningBlock = document.getElementById('reasoningBlock');
+
+    function showError(msg) {
+        loadingPanel.classList.add('d-none');
+        errorBox.textContent = msg;
+        errorBox.classList.remove('d-none');
+    }
+
+    function renderResults(review) {
+        const score = review.overall_score ?? review.OverallScore ?? 0;
+        const scoreColor = score >= 8 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444';
+        const scoreBg    = score >= 8 ? '#f0fdf4' : score >= 5 ? '#fffbeb' : '#fef2f2';
+
+        const scoreCard = document.getElementById('scoreCard');
+        scoreCard.style.background = scoreBg;
+        const scoreVal = document.getElementById('scoreVal');
+        scoreVal.textContent = score;
+        scoreVal.style.color = scoreColor;
+
+        document.getElementById('overallSummary').textContent =
+            review.overall_summary ?? review.OverallSummary ?? '';
+
+        const fillList = (id, items) => {
+            const ul = document.getElementById(id);
+            (items || []).forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'text-muted small mb-1';
+                li.textContent = item;
+                ul.appendChild(li);
+            });
+        };
+
+        fillList('wentWellList',  review.went_well    ?? review.WentWell    ?? []);
+        fillList('toImproveList', review.to_improve   ?? review.ToImprove   ?? []);
+        fillList('nextWeekList',  review.next_week_goals ?? review.NextWeekGoals ?? []);
+
+        loadingPanel.classList.add('d-none');
+        resultsPanel.classList.remove('d-none');
+    }
+
+    // Get anti-forgery token from any existing form on the page or meta tag
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value
+        ?? document.querySelector('meta[name="RequestVerificationToken"]')?.content ?? '';
+
+    let response;
+    try {
+        const fd = new FormData();
+        fd.append('__RequestVerificationToken', token);
+        response = await fetch('/Nutrition/WeeklyReviewStream', { method: 'POST', body: fd });
+    } catch {
+        showError('Network error. Please try again.');
+        return;
+    }
+
+    if (!response.ok) { showError('Server error. Please try again.'); return; }
+
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            let data;
+            try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+            if (data.type === 'thinking') {
+                reasoningBlock.classList.remove('d-none');
+                thinkingText.textContent += data.text;
+                thinkingText.scrollTop = thinkingText.scrollHeight;
+            } else if (data.type === 'done') {
+                renderResults(data.review);
+            } else if (data.type === 'error') {
+                showError(data.message);
+            }
+        }
+    }
+})();
+</script>
+}

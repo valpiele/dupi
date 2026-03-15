@@ -37,7 +37,10 @@
         <h2 class="mb-0 fw-bold">Nutrition</h2>
         <p class="text-muted small mb-0">Your meal and nutrition plan analyses.</p>
     </div>
-    <a asp-action="Create" class="btn btn-dark px-4" style="border-radius:8px;">+ Analyse a meal</a>
+    <div class="d-flex gap-2">
+        <a asp-action="WeeklyReview" class="btn btn-outline-dark btn-sm px-3" style="border-radius:8px;">📊 Weekly review</a>
+        <a asp-action="Create" class="btn btn-dark px-4" style="border-radius:8px;">+ Analyse a meal</a>
+    </div>
 </div>
 
 @if (TempData["Error"] != null)

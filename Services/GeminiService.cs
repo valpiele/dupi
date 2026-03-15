@@ -63,6 +63,85 @@ public class GeminiService
         }
     }
 
+    public async IAsyncEnumerable<(bool IsThinking, string Text)> StreamWeeklyReviewAsync(
+        string weekSummary,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var schema = new
+        {
+            type = "OBJECT",
+            properties = new
+            {
+                overall_score   = new { type = "INTEGER", description = "Overall nutrition score for the week, 1-10" },
+                overall_summary = new { type = "STRING",  description = "One sentence summarising the week's nutrition" },
+                went_well       = new { type = "ARRAY", items = new { type = "STRING" }, description = "3 things the user did well this week" },
+                to_improve      = new { type = "ARRAY", items = new { type = "STRING" }, description = "3 specific areas to improve" },
+                next_week_goals = new { type = "ARRAY", items = new { type = "STRING" }, description = "3 concrete, actionable goals for next week" }
+            },
+            required = new[] { "overall_score", "overall_summary", "went_well", "to_improve", "next_week_goals" }
+        };
+
+        var prompt = $"""
+            You are a professional nutritionist and health coach reviewing a client's weekly nutrition log.
+            Provide an honest, encouraging, and specific weekly review.
+            Be concrete and actionable — avoid generic advice.
+
+            --- Weekly nutrition data ---
+            {weekSummary}
+            --- End of data ---
+            """;
+
+        var body = new
+        {
+            contents = new[] { new { parts = new[] { new { text = prompt } } } },
+            generationConfig = new
+            {
+                responseMimeType = "application/json",
+                responseSchema = schema,
+                thinkingConfig = new { thinkingBudget = -1 }
+            }
+        };
+
+        var url = string.Format(StreamEndpoint, _apiKey);
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body)
+        };
+
+        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+
+        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct);
+            if (line == null || !line.StartsWith("data: ")) continue;
+
+            JsonElement chunk;
+            try { chunk = JsonSerializer.Deserialize<JsonElement>(line["data: ".Length..]); }
+            catch { continue; }
+
+            if (!chunk.TryGetProperty("candidates", out var candidates) || candidates.GetArrayLength() == 0) continue;
+            if (!candidates[0].TryGetProperty("content", out var content)) continue;
+            if (!content.TryGetProperty("parts", out var parts)) continue;
+
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (!part.TryGetProperty("text", out var textEl)) continue;
+                var text = textEl.GetString() ?? "";
+                if (string.IsNullOrEmpty(text)) continue;
+                bool isThought = part.TryGetProperty("thought", out var thoughtEl) && thoughtEl.GetBoolean();
+                yield return (isThought, text);
+            }
+        }
+    }
+
     private object BuildBody(string? userText, byte[]? fileData, string? mimeType, string? contextSummary, bool withThinking)
     {
         var parts = new List<object>();

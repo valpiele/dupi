@@ -178,6 +178,63 @@ public class NutritionController : Controller
         return File(stream, mime);
     }
 
+    // GET /Nutrition/WeeklyReview
+    [HttpGet]
+    public IActionResult WeeklyReview() => View();
+
+    // POST /Nutrition/WeeklyReviewStream — SSE endpoint
+    [HttpPost("Nutrition/WeeklyReviewStream"), ValidateAntiForgeryToken]
+    public async Task WeeklyReviewStream()
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["X-Accel-Buffering"] = "no";
+
+        async Task Send(object payload)
+        {
+            await Response.WriteAsync($"data: {JsonSerializer.Serialize(payload)}\n\n");
+            await Response.Body.FlushAsync();
+        }
+
+        var weekSummary = await _nutritionService.GetWeekSummaryAsync(UserId);
+
+        var outputBuffer = new StringBuilder();
+        try
+        {
+            await foreach (var (isThinking, text) in _geminiService.StreamWeeklyReviewAsync(
+                weekSummary, HttpContext.RequestAborted))
+            {
+                if (isThinking)
+                    await Send(new { type = "thinking", text });
+                else
+                {
+                    outputBuffer.Append(text);
+                    await Send(new { type = "output", text });
+                }
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex)
+        {
+            await Send(new { type = "error", message = $"Could not generate review: {ex.Message}" });
+            return;
+        }
+
+        WeeklyReview review;
+        try
+        {
+            review = JsonSerializer.Deserialize<WeeklyReview>(outputBuffer.ToString())
+                ?? throw new InvalidOperationException("Empty response from Gemini.");
+        }
+        catch (Exception ex)
+        {
+            await Send(new { type = "error", message = $"Could not parse review: {ex.Message}" });
+            return;
+        }
+
+        await Send(new { type = "done", review });
+    }
+
     // POST /Nutrition/Delete
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(string id)

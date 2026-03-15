@@ -24,6 +24,46 @@ public class NutritionService
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
 
+    public async Task<string> GetWeekSummaryAsync(string userId)
+    {
+        var since = DateTime.UtcNow.AddDays(-7);
+        var plans = await _db.NutritionPlans
+            .Where(p => p.UserId == userId && p.CreatedAt >= since && p.CaloriesMin > 0)
+            .OrderBy(p => p.CreatedAt)
+            .ToListAsync();
+
+        if (plans.Count == 0)
+            return "No meals were logged this week.";
+
+        var days = plans.GroupBy(p => p.CreatedAt.Date).OrderBy(g => g.Key).ToList();
+        var sb   = new System.Text.StringBuilder();
+
+        sb.AppendLine($"Week: {since:MMM d} – {DateTime.UtcNow:MMM d, yyyy}");
+        sb.AppendLine($"Total meals logged: {plans.Count} across {days.Count} day(s) out of 7.");
+        sb.AppendLine($"Total calories consumed: ~{plans.Sum(p => (p.CaloriesMin + p.CaloriesMax) / 2):0} kcal");
+        sb.AppendLine($"Daily average: ~{plans.Average(p => (p.CaloriesMin + p.CaloriesMax) / 2.0):0} kcal");
+        sb.AppendLine($"Macro totals — Protein: {plans.Sum(p => p.Proteins):0}g | Carbs: {plans.Sum(p => p.Carbohydrates):0}g | Fat: {plans.Sum(p => p.Fats):0}g");
+
+        var scored = plans.Where(p => p.Score > 0).ToList();
+        if (scored.Count > 0)
+        {
+            sb.AppendLine($"Average meal score: {scored.Average(p => p.Score):0.1}/10");
+            sb.AppendLine($"Best meal: {scored.OrderByDescending(p => p.Score).First().FoodDescription} (score {scored.Max(p => p.Score)}/10)");
+            sb.AppendLine($"Lowest-scored meal: {scored.OrderBy(p => p.Score).First().FoodDescription} (score {scored.Min(p => p.Score)}/10)");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Day-by-day breakdown:");
+        foreach (var day in days)
+        {
+            var dayTotal = day.Sum(p => (p.CaloriesMin + p.CaloriesMax) / 2.0);
+            var meals    = string.Join(", ", day.Select(p => p.FoodDescription.Length > 40 ? p.FoodDescription[..40] + "…" : p.FoodDescription));
+            sb.AppendLine($"  {day.Key:MMM d}: {day.Count()} meal(s), ~{dayTotal:0} kcal — {meals}");
+        }
+
+        return sb.ToString();
+    }
+
     public async Task<string?> GetRecentContextSummaryAsync(string userId)
     {
         var since = DateTime.UtcNow.AddDays(-7);
