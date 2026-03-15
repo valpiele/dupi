@@ -6,6 +6,9 @@ obj/
 .vs/
 *.user
 
+# Claude Code
+.claude/
+
 # Secrets & credentials
 google-credds
 appsettings.Development.json
