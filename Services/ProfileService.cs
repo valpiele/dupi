@@ -14,7 +14,7 @@ public class ProfileService
     {
         var connectionString = config["Azure:StorageConnectionString"]!;
         _container = new BlobContainerClient(connectionString, "uploads");
-        _container.CreateIfNotExists();
+        try { _container.CreateIfNotExists(); } catch { /* container may be mid-deletion; next request will retry */ }
     }
 
     // ---------- Profile ----------
