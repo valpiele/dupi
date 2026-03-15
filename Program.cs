@@ -5,15 +5,33 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Railway provides DATABASE_URL as postgresql://user:pass@host:port/db
-// Convert it to the Npgsql connection string format
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("No database connection string found.");
+// Resolve connection string — try DATABASE_URL, then individual PG* vars, then appsettings
+string connectionString;
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 
-var connectionString = databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://")
-    ? ConvertDatabaseUrl(databaseUrl)
-    : databaseUrl;
+if (!string.IsNullOrEmpty(databaseUrl))
+{
+    connectionString = databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://")
+        ? ConvertDatabaseUrl(databaseUrl)
+        : databaseUrl;
+}
+else
+{
+    var pgHost = Environment.GetEnvironmentVariable("PGHOST");
+    if (!string.IsNullOrEmpty(pgHost))
+    {
+        var pgPort     = Environment.GetEnvironmentVariable("PGPORT") ?? "5432";
+        var pgUser     = Environment.GetEnvironmentVariable("PGUSER") ?? "postgres";
+        var pgPassword = Environment.GetEnvironmentVariable("PGPASSWORD") ?? "";
+        var pgDatabase = Environment.GetEnvironmentVariable("PGDATABASE") ?? "railway";
+        connectionString = $"Host={pgHost};Port={pgPort};Database={pgDatabase};Username={pgUser};Password={pgPassword};SSL Mode=Require;Trust Server Certificate=true";
+    }
+    else
+    {
+        connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("No database connection string found.");
+    }
+}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
