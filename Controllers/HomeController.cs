@@ -13,12 +13,7 @@ public class HomeController : Controller
         _logger = logger;
     }
 
-    public IActionResult Index()
-    {
-        if (User.Identity?.IsAuthenticated == true)
-            return RedirectToAction("Index", "Projects");
-        return View(new LoginViewModel());
-    }
+    public IActionResult Index() => View();
 
     public IActionResult Privacy()
     {
