@@ -1,9 +1,9 @@
-@model List<dupi.Models.NutritionPlan>
+@model dupi.Models.NutritionIndexViewModel
 @{
     ViewData["Title"] = "Nutrition";
 
     var mealsJson = System.Text.Json.JsonSerializer.Serialize(
-        Model.Where(p => p.Score > 0)
+        Model.Plans.Where(p => p.Score > 0)
              .OrderBy(p => p.CreatedAt)
              .Select(p => new {
                  score = p.Score,
@@ -13,7 +13,19 @@
              })
     );
 
-    bool hasScored = Model.Any(p => p.Score > 0);
+    bool hasScored = Model.Plans.Any(p => p.Score > 0);
+
+    // Today summary
+    var todayMealCount  = Model.TodayPlans.Count;
+    var todayCalMin     = Model.TodayPlans.Sum(p => p.CaloriesMin);
+    var todayCalMax     = Model.TodayPlans.Sum(p => p.CaloriesMax);
+    var todayProtein    = Model.TodayPlans.Sum(p => p.Proteins);
+    var todayCarbs      = Model.TodayPlans.Sum(p => p.Carbohydrates);
+    var todayFat        = Model.TodayPlans.Sum(p => p.Fats);
+    var todayMacrosTotal = todayProtein + todayCarbs + todayFat;
+    double todayPPct    = todayMacrosTotal > 0 ? todayProtein / todayMacrosTotal * 100 : 0;
+    double todayCPct    = todayMacrosTotal > 0 ? todayCarbs   / todayMacrosTotal * 100 : 0;
+    double todayFPct    = todayMacrosTotal > 0 ? todayFat     / todayMacrosTotal * 100 : 0;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -29,7 +41,7 @@
     <div class="alert alert-danger">@TempData["Error"]</div>
 }
 
-@if (!Model.Any())
+@if (!Model.Plans.Any())
 {
     <div class="text-center py-5 text-muted">
         <div style="font-size:3rem;">🥗</div>
@@ -39,6 +51,45 @@
 }
 else
 {
+    @* ── Today's Summary ── *@
+    <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-semibold small">Today</span>
+                <span class="text-muted small">
+                    @todayMealCount meal@(todayMealCount != 1 ? "s" : "") logged
+                </span>
+            </div>
+            @if (todayMealCount > 0)
+            {
+                <div class="d-flex flex-wrap align-items-baseline gap-3 mb-2">
+                    <div>
+                        <span class="fw-bold" style="font-size:1.15rem;">@todayCalMin–@todayCalMax</span>
+                        <span class="text-muted small"> kcal</span>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span style="color:#3b82f6; font-weight:600; font-size:0.88rem;">P @todayProtein.ToString("0")g</span>
+                        <span style="color:#f59e0b; font-weight:600; font-size:0.88rem;">C @todayCarbs.ToString("0")g</span>
+                        <span style="color:#ec4899; font-weight:600; font-size:0.88rem;">F @todayFat.ToString("0")g</span>
+                    </div>
+                </div>
+                @if (todayMacrosTotal > 0)
+                {
+                    <div style="height:6px; border-radius:3px; overflow:hidden; background:#f3f4f6; display:flex;">
+                        <div style="width:@todayPPct.ToString("0.#")%; background:#3b82f6;"></div>
+                        <div style="width:@todayCPct.ToString("0.#")%; background:#f59e0b;"></div>
+                        <div style="width:@todayFPct.ToString("0.#")%; background:#ec4899;"></div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="text-muted small mb-0">No meals logged today. <a asp-action="Create" class="text-dark">Log your first meal of the day →</a></p>
+            }
+        </div>
+    </div>
+
+    @* ── Score History Chart ── *@
     @if (hasScored)
     {
         <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;">
@@ -63,8 +114,9 @@ else
         </div>
     }
 
+    @* ── Meal Cards ── *@
     <div class="row g-3">
-        @foreach (var plan in Model)
+        @foreach (var plan in Model.Plans)
         {
             var scoreColor = plan.Score >= 8 ? "#22c55e" : plan.Score >= 5 ? "#f59e0b" : plan.Score > 0 ? "#ef4444" : "#9ca3af";
             var scoreBg   = plan.Score >= 8 ? "#f0fdf4" : plan.Score >= 5 ? "#fffbeb" : plan.Score > 0 ? "#fef2f2" : "#f9fafb";
@@ -126,7 +178,7 @@ function isoWeekKey(iso) {
     d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
     const jan4 = new Date(d.getFullYear(), 0, 4);
     const wk = 1 + Math.round(((d - jan4) / 86400000 - 3 + (jan4.getDay() + 6) % 7) / 7);
-    return `${d.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+    return `${d.getFullYear()}-W${String(wk).padStart(2, '00')}`;
 }
 
 function weekLabel(iso) {

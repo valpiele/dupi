@@ -1,5 +1,6 @@
 using dupi.Models;
 using dupi.Services;
+using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -29,7 +30,9 @@ public class NutritionController : Controller
     public async Task<IActionResult> Index()
     {
         var plans = await _nutritionService.GetPlansAsync(UserId);
-        return View(plans);
+        var today = DateTime.UtcNow.Date;
+        var todayPlans = plans.Where(p => p.CreatedAt.Date == today).ToList();
+        return View(new NutritionIndexViewModel { Plans = plans, TodayPlans = todayPlans });
     }
 
     // GET /Nutrition/Create
