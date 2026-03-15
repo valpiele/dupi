@@ -55,7 +55,8 @@
                 <div class="d-flex flex-column gap-3">
                     @foreach (var (challenge, count, rank, daysHit) in Model.ActiveChallenges)
                     {
-                        var dayNum = Math.Min(7, (int)(DateTime.UtcNow - challenge.StartDate).TotalDays + 1);
+                        var isPending = challenge.Status == ChallengeStatus.Pending;
+                        var dayNum = isPending ? 0 : Math.Min(7, (int)(DateTime.UtcNow - challenge.StartDate).TotalDays + 1);
                         var (mName, mUnit, mEmoji) = ChallengeMetricHelper.GetInfo(challenge.Metric);
                         var dirLabel = challenge.Direction == GoalDirection.AtMost ? "max" : "min";
                         <a asp-action="Dashboard" asp-route-id="@challenge.Id" class="text-decoration-none">
@@ -66,11 +67,25 @@
                                             <h6 class="fw-semibold mb-1 text-dark">@mEmoji @challenge.Title</h6>
                                             <div class="text-muted small">
                                                 @mName: @dirLabel @challenge.TargetValue.ToString("0")@mUnit/day &middot;
-                                                Day @dayNum of 7 &middot;
+                                                @if (isPending)
+                                                {
+                                                    @:Starts @challenge.StartDate.ToString("MMM d") &middot;
+                                                }
+                                                else
+                                                {
+                                                    @:Day @dayNum of 7 &middot;
+                                                }
                                                 @count participant@(count != 1 ? "s" : "")
                                             </div>
                                         </div>
-                                        <span class="badge bg-success">Active</span>
+                                        @if (isPending)
+                                        {
+                                            <span class="badge bg-warning text-dark">Starts soon</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
                                     </div>
                                 </div>
                             </div>
