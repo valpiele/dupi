@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using dupi.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace dupi.Controllers;
 
@@ -17,7 +17,7 @@ public class HomeController : Controller
     {
         if (User.Identity?.IsAuthenticated == true)
             return RedirectToAction("Index", "Projects");
-        return View();
+        return View(new LoginViewModel());
     }
 
     public IActionResult Privacy()
