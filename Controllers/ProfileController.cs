@@ -28,7 +28,6 @@ public class ProfileController : Controller
             User.FindFirstValue(ClaimTypes.Email) ?? "",
             User.FindFirstValue(ClaimTypes.Name) ?? "");
 
-        ViewBag.Projects = _profileService.GetProjects(UserId);
         return View(profile);
     }
 
@@ -42,14 +41,12 @@ public class ProfileController : Controller
         if (!ProfileService.IsValidUsername(model.Username))
         {
             TempData["Error"] = "Username must be 3–30 characters and contain only letters, numbers, hyphens or underscores.";
-            ViewBag.Projects = _profileService.GetProjects(UserId);
             return View("Index", model);
         }
 
         if (_profileService.IsUsernameTaken(model.Username, UserId))
         {
             TempData["Error"] = $"'{model.Username}' is already taken. Please choose another.";
-            ViewBag.Projects = _profileService.GetProjects(UserId);
             return View("Index", model);
         }
 
@@ -64,8 +61,6 @@ public class ProfileController : Controller
         var profile = _profileService.GetPublicProfileByUsername(username);
         if (profile == null) return NotFound();
 
-        ViewBag.Projects = _profileService.GetProjects(profile.UserId);
-
         var currentUserId = User.FindFirstValue("dupi:uid");
         if (!string.IsNullOrEmpty(currentUserId) && currentUserId != profile.UserId)
         {
@@ -75,17 +70,5 @@ public class ProfileController : Controller
         }
 
         return View(profile);
-    }
-
-    [Route("u/{username}/view")]
-    public IActionResult PublicView(string username, string fileName)
-    {
-        var profile = _profileService.GetPublicProfileByUsername(username);
-        if (profile == null) return NotFound();
-
-        if (!_profileService.ProjectExists(profile.UserId, fileName)) return NotFound();
-        var stream = _profileService.DownloadProject(profile.UserId, fileName);
-        Response.Headers["Content-Disposition"] = $"inline; filename=\"{fileName}\"";
-        return File(stream, "application/pdf");
     }
 }
