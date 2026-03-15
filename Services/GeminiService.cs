@@ -8,7 +8,7 @@ public class GeminiService
 {
     private readonly HttpClient _http;
     private readonly string _apiKey;
-    private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={0}";
+    private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={0}";
 
     public GeminiService(HttpClient http, IConfiguration config)
     {
