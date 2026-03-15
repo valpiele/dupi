@@ -14,10 +14,44 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IDataPro
 
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<NutritionPlan> NutritionPlans => Set<NutritionPlan>();
+    public DbSet<Friendship> Friendships => Set<Friendship>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<Friendship>(e =>
+        {
+            e.HasIndex(f => new { f.SenderId, f.ReceiverId }).IsUnique();
+            e.HasIndex(f => f.ReceiverId);
+
+            e.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(f => f.SenderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(f => f.ReceiverId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Message>(e =>
+        {
+            e.HasIndex(m => new { m.SenderId, m.ReceiverId });
+            e.HasIndex(m => new { m.ReceiverId, m.IsRead });
+
+            e.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(m => m.SenderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(m => m.ReceiverId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         var listComparer = new ValueComparer<List<string>>(
             (a, b) => a != null && b != null && a.SequenceEqual(b),
