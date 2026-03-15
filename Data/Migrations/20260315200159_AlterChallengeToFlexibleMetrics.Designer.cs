@@ -12,8 +12,8 @@ using dupi.Data;
 namespace dupi.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260315195316_AddChallengeTables")]
-    partial class AddChallengeTables
+    [Migration("20260315200159_AlterChallengeToFlexibleMetrics")]
+    partial class AlterChallengeToFlexibleMetrics
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
