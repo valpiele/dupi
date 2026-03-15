@@ -46,16 +46,19 @@
         </button>
     </form>
 
-    <!-- Thinking panel — shown while Gemini streams its reasoning -->
-    <div id="thinkingPanel" class="d-none">
-        <div class="d-flex align-items-center gap-2 mb-3">
-            <span class="spinner-border spinner-border-sm text-muted"></span>
-            <span class="fw-medium text-muted" id="thinkingLabel">Gemini is thinking...</span>
+    <!-- Analysis panel — shown while Gemini streams -->
+    <div id="thinkingPanel" class="d-none text-center py-4">
+        <div class="spinner-border text-secondary mb-3" style="width:2rem;height:2rem;"></div>
+        <p class="fw-semibold mb-1" id="thinkingLabel">Analysing your meal...</p>
+        <p class="text-muted small mb-4" id="thinkingSubLabel">Gemini is working on it</p>
+
+        <!-- Reasoning block — only appears if thinking tokens arrive -->
+        <div id="reasoningBlock" class="d-none text-start mt-2">
+            <p class="text-muted small fw-medium mb-1" style="letter-spacing:.03em;">GEMINI'S REASONING</p>
+            <div id="thinkingText"
+                 class="border-start border-2 ps-3 text-muted small"
+                 style="max-height:220px; overflow-y:auto; white-space:pre-wrap; line-height:1.7;"></div>
         </div>
-        <div id="thinkingText"
-             class="border rounded p-3 small"
-             style="max-height:260px; overflow-y:auto; white-space:pre-wrap; background:#f8f9fa; line-height:1.6;"></div>
-        <p class="text-muted small mt-2 mb-0">Hang tight — results will appear automatically when done.</p>
     </div>
 </div>
 
@@ -66,9 +69,11 @@
     const imgPreview = document.getElementById('imgPreview');
     const form       = document.getElementById('analyseForm');
     const errorBox   = document.getElementById('errorBox');
-    const thinkingPanel = document.getElementById('thinkingPanel');
-    const thinkingText  = document.getElementById('thinkingText');
-    const thinkingLabel = document.getElementById('thinkingLabel');
+    const thinkingPanel   = document.getElementById('thinkingPanel');
+    const thinkingText    = document.getElementById('thinkingText');
+    const thinkingLabel   = document.getElementById('thinkingLabel');
+    const thinkingSubLabel = document.getElementById('thinkingSubLabel');
+    const reasoningBlock  = document.getElementById('reasoningBlock');
 
     fileInput.addEventListener('change', () => {
         const file = fileInput.files[0];
@@ -122,19 +127,12 @@
                 try { data = JSON.parse(line.slice(6)); } catch { continue; }
 
                 if (data.type === 'thinking') {
-                    const span = document.createElement('span');
-                    span.style.color = '#555';
-                    span.textContent = data.text;
-                    thinkingText.appendChild(span);
+                    reasoningBlock.classList.remove('d-none');
+                    thinkingText.textContent += data.text;
                     thinkingText.scrollTop = thinkingText.scrollHeight;
                 } else if (data.type === 'output') {
-                    const span = document.createElement('span');
-                    span.style.color = '#999';
-                    span.style.fontSize = '0.8em';
-                    span.textContent = data.text;
-                    thinkingText.appendChild(span);
-                    thinkingLabel.textContent = 'Gemini is responding...';
-                    thinkingText.scrollTop = thinkingText.scrollHeight;
+                    thinkingLabel.textContent = 'Building your report...';
+                    thinkingSubLabel.textContent = 'Almost there';
                 } else if (data.type === 'done') {
                     window.location.href = data.redirectUrl;
                 } else if (data.type === 'error') {
