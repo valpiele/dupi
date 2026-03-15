@@ -1,6 +1,7 @@
 @model dupi.Models.UserProfile
 @{
     ViewData["Title"] = "My Profile";
+    var projects = ViewBag.Projects as List<dupi.Models.Project> ?? new();
 }
 
 <div class="container mt-4" style="max-width: 700px;">
@@ -54,11 +55,58 @@
                     <input type="hidden" name="IsPublic" value="false" />
                     <label class="form-check-label" for="isPublic">Make my profile public</label>
                 </div>
-                <small class="text-muted">When public, anyone can find you on the Discover page.</small>
+                <small class="text-muted">When public, anyone can find you on the Discover page and view your projects.</small>
             </div>
             <div class="card-footer text-end">
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </div>
     </form>
+
+    <h5 class="mb-3">My Projects (@projects.Count)</h5>
+    @if (!projects.Any())
+    {
+        <p class="text-muted">No projects yet. <a asp-controller="Projects" asp-action="Index">Upload one</a>.</p>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-3 g-3">
+            @foreach (var p in projects)
+            {
+                <div class="col">
+                    <div class="card h-100 shadow-sm">
+                        <div style="height:140px; background:#f1f3f4; display:flex; align-items:center; justify-content:center; overflow:hidden; border-bottom:1px solid rgba(0,0,0,.1);">
+                            <canvas class="pdf-thumb"
+                                    data-src="/Projects/View?fileName=@Uri.EscapeDataString(p.FileName)"
+                                    style="max-width:100%; max-height:100%;"></canvas>
+                        </div>
+                        <div class="card-body py-2">
+                            <p class="mb-0 text-truncate small fw-semibold" title="@p.DisplayName">@p.DisplayName</p>
+                            <small class="text-muted">@p.FileSizeFormatted</small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        document.querySelectorAll('.pdf-thumb').forEach(canvas => {
+            pdfjsLib.getDocument(canvas.dataset.src).promise
+                .then(pdf => pdf.getPage(1))
+                .then(page => {
+                    const scale = canvas.parentElement.clientWidth / page.getViewport({ scale: 1 }).width;
+                    const vp = page.getViewport({ scale });
+                    canvas.width = vp.width;
+                    canvas.height = vp.height;
+                    page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
+                });
+        });
+    </script>
+}
