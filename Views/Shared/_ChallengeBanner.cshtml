@@ -1,12 +1,15 @@
+@using dupi.Models
 @{
-    var challenge = ViewBag.ActiveChallenge as dupi.Models.Challenge;
-    var todayProtein = (double)(ViewBag.TodayProtein ?? 0.0);
+    var challenge = ViewBag.ActiveChallenge as Challenge;
+    var todayValue = (double)(ViewBag.TodayMetricValue ?? 0.0);
     if (challenge == null) return;
 
     var dayNum = Math.Clamp((int)(DateTime.UtcNow.Date - challenge.StartDate.Date).TotalDays + 1, 1, 7);
-    var target = challenge.ProteinTargetGrams;
-    var pct = target > 0 ? Math.Min(100, todayProtein / target * 100) : 0;
-    var hit = todayProtein >= target;
+    var target = challenge.TargetValue;
+    var (metricName, metricUnit, metricEmoji) = ChallengeMetricHelper.GetInfo(challenge.Metric);
+    var pct = target > 0 ? Math.Min(100, todayValue / target * 100) : 0;
+    var hit = ChallengeMetricHelper.IsTargetHit(todayValue, target, challenge.Direction);
+    var dirLabel = challenge.Direction == GoalDirection.AtMost ? "max" : "min";
 }
 
 <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important; background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
@@ -14,7 +17,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <div class="flex-grow-1">
                 <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="fw-semibold small">@challenge.Title</span>
+                    <span class="fw-semibold small">@metricEmoji @challenge.Title</span>
                     <span class="badge bg-success" style="font-size:0.65rem;">Day @dayNum of 7</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -22,7 +25,7 @@
                         <div style="width:@pct.ToString("0")%; height:100%; background:@(hit ? "#22c55e" : "#3b82f6"); border-radius:4px; transition: width 0.3s;"></div>
                     </div>
                     <span class="small fw-semibold" style="color:@(hit ? "#22c55e" : "#3b82f6"); white-space:nowrap;">
-                        @todayProtein.ToString("0")g / @target g
+                        @todayValue.ToString("0")@metricUnit / @target.ToString("0")@metricUnit @dirLabel
                     </span>
                 </div>
             </div>

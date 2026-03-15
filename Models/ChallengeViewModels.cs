@@ -4,7 +4,9 @@ public class ChallengeCreateViewModel
 {
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int ProteinTargetGrams { get; set; } = 120;
+    public ChallengeMetric Metric { get; set; } = ChallengeMetric.Protein;
+    public double TargetValue { get; set; } = 120;
+    public GoalDirection Direction { get; set; } = GoalDirection.AtLeast;
     public ChallengeType Type { get; set; } = ChallengeType.FriendChallenge;
     public List<string> InvitedFriendIds { get; set; } = new();
 }
@@ -32,8 +34,8 @@ public class ParticipantProgress
     public string UserId { get; set; } = string.Empty;
     public UserProfile? Profile { get; set; }
     public int DaysHit { get; set; }
-    public double TotalProtein { get; set; }
-    public double AverageProtein { get; set; }
+    public double TotalMetricValue { get; set; }
+    public double AverageMetricValue { get; set; }
     public double AverageScore { get; set; }
     public int TotalMeals { get; set; }
     public List<DayProgress> DailyBreakdown { get; set; } = new();
@@ -43,7 +45,7 @@ public class ParticipantProgress
 public class DayProgress
 {
     public DateTime Date { get; set; }
-    public double ProteinGrams { get; set; }
+    public double MetricValue { get; set; }
     public int MealCount { get; set; }
     public double AverageScore { get; set; }
     public bool TargetHit { get; set; }

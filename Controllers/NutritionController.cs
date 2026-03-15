@@ -47,7 +47,15 @@ public class NutritionController : Controller
         if (activeChallenge != null)
         {
             ViewBag.ActiveChallenge = activeChallenge;
-            ViewBag.TodayProtein = todayPlans.Sum(p => p.Proteins);
+            if (activeChallenge.Metric == ChallengeMetric.Score)
+            {
+                var scored = todayPlans.Where(p => p.Score > 0).ToList();
+                ViewBag.TodayMetricValue = scored.Count > 0 ? scored.Average(p => p.Score) : 0.0;
+            }
+            else
+            {
+                ViewBag.TodayMetricValue = todayPlans.Sum(p => ChallengeMetricHelper.ExtractValue(p, activeChallenge.Metric));
+            }
         }
 
         return View(new NutritionIndexViewModel { Plans = plans, TodayPlans = todayPlans, CurrentStreak = streak });
@@ -178,6 +186,8 @@ public class NutritionController : Controller
         {
             var participants = await _challengeService.ComputeLeaderboardAsync(activeChallenge.Id);
             var displayName = User.FindFirstValue(ClaimTypes.Name) ?? "Someone";
+            var (metricName, metricUnit, _) = ChallengeMetricHelper.GetInfo(activeChallenge.Metric);
+            var metricValue = ChallengeMetricHelper.ExtractValue(plan, activeChallenge.Metric);
             foreach (var p in participants)
             {
                 if (p.UserId != UserId)
@@ -187,8 +197,8 @@ public class NutritionController : Controller
                         challengeId = activeChallenge.Id,
                         userId = UserId,
                         displayName,
-                        protein = analysis.Proteins,
-                        message = $"{displayName} logged {analysis.Proteins:0}g protein!"
+                        metricValue,
+                        message = $"{displayName} logged {metricValue:0}{metricUnit} {metricName.ToLower()}!"
                     });
                 }
             }

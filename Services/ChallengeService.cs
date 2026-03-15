@@ -32,13 +32,15 @@ public class ChallengeService
 
     public async Task<Challenge> CreateAsync(string creatorId, ChallengeCreateViewModel model)
     {
-        var startDate = DateTime.UtcNow.Date.AddDays(1); // tomorrow 00:00 UTC
+        var startDate = DateTime.UtcNow.Date.AddDays(1);
         var challenge = new Challenge
         {
             CreatorId = creatorId,
             Title = model.Title.Trim(),
             Description = model.Description?.Trim(),
-            ProteinTargetGrams = Math.Clamp(model.ProteinTargetGrams, 10, 300),
+            Metric = model.Metric,
+            TargetValue = model.TargetValue,
+            Direction = model.Direction,
             Type = model.Type,
             Status = model.Type == ChallengeType.Community ? ChallengeStatus.Active : ChallengeStatus.Pending,
             StartDate = model.Type == ChallengeType.Community ? DateTime.UtcNow.Date : startDate,
@@ -48,7 +50,6 @@ public class ChallengeService
         _db.Challenges.Add(challenge);
         await _db.SaveChangesAsync();
 
-        // Add creator as participant
         _db.ChallengeParticipants.Add(new ChallengeParticipant
         {
             ChallengeId = challenge.Id,
@@ -231,21 +232,35 @@ public class ChallengeService
             {
                 var date = challenge.StartDate.Date.AddDays(day);
                 var dayPlans = userPlans.Where(p => p.CreatedAt.Date == date).ToList();
-                var dayProtein = dayPlans.Sum(p => p.Proteins);
+
+                double dayMetricValue;
+                if (challenge.Metric == ChallengeMetric.Score)
+                {
+                    // For score: average per day, not sum
+                    var scored = dayPlans.Where(p => p.Score > 0).ToList();
+                    dayMetricValue = scored.Count > 0 ? scored.Average(p => p.Score) : 0;
+                }
+                else
+                {
+                    dayMetricValue = dayPlans.Sum(p => ChallengeMetricHelper.ExtractValue(p, challenge.Metric));
+                }
+
                 var dayScores = dayPlans.Where(p => p.Score > 0).ToList();
 
                 dailyBreakdown.Add(new DayProgress
                 {
                     Date = date,
-                    ProteinGrams = dayProtein,
+                    MetricValue = dayMetricValue,
                     MealCount = dayPlans.Count,
                     AverageScore = dayScores.Count > 0 ? dayScores.Average(p => p.Score) : 0,
-                    TargetHit = dayProtein >= challenge.ProteinTargetGrams
+                    TargetHit = date <= today && ChallengeMetricHelper.IsTargetHit(dayMetricValue, challenge.TargetValue, challenge.Direction)
                 });
             }
 
             var scoredPlans = userPlans.Where(p => p.Score > 0).ToList();
-            var totalProtein = userPlans.Sum(p => p.Proteins);
+            var totalMetric = challenge.Metric == ChallengeMetric.Score
+                ? (scoredPlans.Count > 0 ? scoredPlans.Average(p => p.Score) : 0)
+                : userPlans.Sum(p => ChallengeMetricHelper.ExtractValue(p, challenge.Metric));
             var activeDays = dailyBreakdown.Where(d => d.Date <= today).ToList();
             var daysWithData = activeDays.Count > 0 ? activeDays.Count : 1;
 
@@ -254,20 +269,26 @@ public class ChallengeService
                 UserId = participant.UserId,
                 Profile = _profileService.GetProfileByUserId(participant.UserId),
                 DaysHit = dailyBreakdown.Count(d => d.TargetHit && d.Date <= today),
-                TotalProtein = totalProtein,
-                AverageProtein = totalProtein / daysWithData,
+                TotalMetricValue = totalMetric,
+                AverageMetricValue = challenge.Metric == ChallengeMetric.Score ? totalMetric : totalMetric / daysWithData,
                 AverageScore = scoredPlans.Count > 0 ? scoredPlans.Average(p => p.Score) : 0,
                 TotalMeals = userPlans.Count,
                 DailyBreakdown = dailyBreakdown
             });
         }
 
-        // Rank: DaysHit DESC → AverageProtein DESC → AverageScore DESC
-        var ranked = results
-            .OrderByDescending(p => p.DaysHit)
-            .ThenByDescending(p => p.AverageProtein)
-            .ThenByDescending(p => p.AverageScore)
-            .ToList();
+        // Rank: DaysHit DESC, then metric value (direction-aware), then score
+        var ranked = challenge.Direction == GoalDirection.AtMost
+            ? results
+                .OrderByDescending(p => p.DaysHit)
+                .ThenBy(p => p.AverageMetricValue)
+                .ThenByDescending(p => p.AverageScore)
+                .ToList()
+            : results
+                .OrderByDescending(p => p.DaysHit)
+                .ThenByDescending(p => p.AverageMetricValue)
+                .ThenByDescending(p => p.AverageScore)
+                .ToList();
 
         for (int i = 0; i < ranked.Count; i++)
             ranked[i].Rank = i + 1;
@@ -282,11 +303,14 @@ public class ChallengeService
         var challenge = await _db.Challenges.FindAsync(challengeId);
         if (challenge == null) return string.Empty;
 
+        var (metricName, metricUnit, _) = ChallengeMetricHelper.GetInfo(challenge.Metric);
+        var directionLabel = challenge.Direction == GoalDirection.AtLeast ? "at least" : "at most";
         var leaderboard = await ComputeLeaderboardAsync(challengeId);
         var sb = new System.Text.StringBuilder();
 
         sb.AppendLine($"Challenge: {challenge.Title}");
-        sb.AppendLine($"Daily protein target: {challenge.ProteinTargetGrams}g");
+        sb.AppendLine($"Metric: {metricName}");
+        sb.AppendLine($"Daily target: {directionLabel} {challenge.TargetValue} {metricUnit}");
         sb.AppendLine($"Duration: {challenge.StartDate:MMM d} – {challenge.EndDate:MMM d, yyyy}");
         sb.AppendLine($"Participants: {leaderboard.Count}");
         sb.AppendLine();
@@ -296,23 +320,26 @@ public class ChallengeService
             var name = p.Profile?.DisplayName ?? "Unknown";
             sb.AppendLine($"--- {name} (Rank #{p.Rank}) ---");
             sb.AppendLine($"  Days hitting target: {p.DaysHit}/7");
-            sb.AppendLine($"  Total protein: {p.TotalProtein:0}g");
-            sb.AppendLine($"  Average daily protein: {p.AverageProtein:0}g");
+            sb.AppendLine($"  Total {metricName.ToLower()}: {p.TotalMetricValue:0} {metricUnit}");
+            sb.AppendLine($"  Average daily {metricName.ToLower()}: {p.AverageMetricValue:0} {metricUnit}");
             sb.AppendLine($"  Average meal score: {p.AverageScore:0.1}/10");
             sb.AppendLine($"  Total meals logged: {p.TotalMeals}");
 
-            var bestDay = p.DailyBreakdown.OrderByDescending(d => d.ProteinGrams).FirstOrDefault();
-            var worstDay = p.DailyBreakdown.Where(d => d.MealCount > 0).OrderBy(d => d.ProteinGrams).FirstOrDefault();
+            var bestDay = p.DailyBreakdown.Where(d => d.MealCount > 0)
+                .OrderByDescending(d => challenge.Direction == GoalDirection.AtLeast ? d.MetricValue : -d.MetricValue)
+                .FirstOrDefault();
+            var worstDay = p.DailyBreakdown.Where(d => d.MealCount > 0)
+                .OrderBy(d => challenge.Direction == GoalDirection.AtLeast ? d.MetricValue : -d.MetricValue)
+                .FirstOrDefault();
             if (bestDay != null)
-                sb.AppendLine($"  Best day: {bestDay.Date:MMM d} with {bestDay.ProteinGrams:0}g protein");
+                sb.AppendLine($"  Best day: {bestDay.Date:MMM d} with {bestDay.MetricValue:0} {metricUnit}");
             if (worstDay != null)
-                sb.AppendLine($"  Worst day: {worstDay.Date:MMM d} with {worstDay.ProteinGrams:0}g protein");
+                sb.AppendLine($"  Worst day: {worstDay.Date:MMM d} with {worstDay.MetricValue:0} {metricUnit}");
             sb.AppendLine();
         }
 
         var totalMeals = leaderboard.Sum(p => p.TotalMeals);
-        var totalProteinAll = leaderboard.Sum(p => p.TotalProtein);
-        sb.AppendLine($"Overall: {totalMeals} meals logged, {totalProteinAll:0}g total protein consumed by all participants.");
+        sb.AppendLine($"Overall: {totalMeals} meals logged across all participants.");
 
         return sb.ToString();
     }

@@ -255,10 +255,13 @@ namespace dupi.Data.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<int>("Direction")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("ProteinTargetGrams")
+                    b.Property<int>("Metric")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("StartDate")
@@ -266,6 +269,9 @@ namespace dupi.Data.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<double>("TargetValue")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Title")
                         .IsRequired()

@@ -208,13 +208,13 @@ public class ChallengeController : Controller
             displayName = p.Profile?.DisplayName ?? "Unknown",
             rank = p.Rank,
             daysHit = p.DaysHit,
-            totalProtein = p.TotalProtein,
-            averageProtein = p.AverageProtein,
+            totalMetricValue = p.TotalMetricValue,
+            averageMetricValue = p.AverageMetricValue,
             totalMeals = p.TotalMeals,
             dailyBreakdown = p.DailyBreakdown.Select(d => new
             {
                 date = d.Date.ToString("o"),
-                proteinGrams = d.ProteinGrams,
+                metricValue = d.MetricValue,
                 mealCount = d.MealCount,
                 targetHit = d.TargetHit
             })
