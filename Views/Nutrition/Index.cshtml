@@ -71,7 +71,13 @@ else
     <div class="card border mb-4" style="border-radius:12px; border-color:#eee !important;">
         <div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-semibold small">Today</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fw-semibold small">Today</span>
+                    @if (Model.CurrentStreak >= 2)
+                    {
+                        <span style="background:#fff7ed; color:#ea580c; border-radius:4px; padding:1px 7px; font-size:0.72rem; font-weight:600;">🔥 @Model.CurrentStreak-day streak</span>
+                    }
+                </div>
                 <span class="text-muted small">
                     @todayMealCount meal@(todayMealCount != 1 ? "s" : "") logged
                 </span>

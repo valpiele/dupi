@@ -32,7 +32,8 @@ public class NutritionController : Controller
         var plans = await _nutritionService.GetPlansAsync(UserId);
         var today = DateTime.UtcNow.Date;
         var todayPlans = plans.Where(p => p.CreatedAt.Date == today).ToList();
-        return View(new NutritionIndexViewModel { Plans = plans, TodayPlans = todayPlans });
+        var streak = ComputeStreak(plans, today);
+        return View(new NutritionIndexViewModel { Plans = plans, TodayPlans = todayPlans, CurrentStreak = streak });
     }
 
     // GET /Nutrition/Create
@@ -241,5 +242,29 @@ public class NutritionController : Controller
     {
         await _nutritionService.DeletePlanAsync(UserId, id);
         return RedirectToAction(nameof(Index));
+    }
+
+    private static int ComputeStreak(List<NutritionPlan> plans, DateTime today)
+    {
+        var loggedDates = plans
+            .Select(p => p.CreatedAt.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .ToList();
+
+        if (loggedDates.Count == 0) return 0;
+
+        // Streak is counted from today; if nothing today, start from yesterday
+        var start = loggedDates[0] == today ? today : (loggedDates[0] == today.AddDays(-1) ? today.AddDays(-1) : (DateTime?)null);
+        if (start == null) return 0;
+
+        int streak = 0;
+        var expected = start.Value;
+        foreach (var date in loggedDates)
+        {
+            if (date == expected) { streak++; expected = expected.AddDays(-1); }
+            else if (date < expected) break;
+        }
+        return streak;
     }
 }
