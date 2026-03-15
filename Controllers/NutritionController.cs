@@ -123,7 +123,6 @@ public class NutritionController : Controller
             UserId = UserId,
             Title = string.IsNullOrWhiteSpace(title) ? "Nutrition Plan" : title.Trim(),
             InputType = fileData != null ? (mimeType!.StartsWith("image") ? "image" : "pdf") : "text",
-            OriginalFileName = file?.FileName,
             HasFile = fileData != null,
             FileExtension = extension,
             FoodDescription = analysis.FoodDescription,
