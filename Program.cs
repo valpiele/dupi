@@ -62,6 +62,8 @@ builder.Services.AddAuthentication()
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<ProfileService>();
+builder.Services.AddScoped<NutritionService>();
+builder.Services.AddHttpClient<GeminiService>();
 
 var app = builder.Build();
 

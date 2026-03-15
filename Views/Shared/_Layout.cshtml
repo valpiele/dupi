@@ -82,6 +82,12 @@
                         <li class="nav-item">
                             <a class="nav-link" asp-controller="Discover" asp-action="Index">Discover</a>
                         </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Nutrition" asp-action="Index">Nutrition</a>
+                            </li>
+                        }
                     </ul>
 
                     <div class="d-flex align-items-center">
