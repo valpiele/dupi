@@ -1,0 +1,27 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=dupi_dev;Username=dupi;Password=dupi_dev;"
+  },
+  "Azure": {
+    "StorageConnectionString": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tiqkX2hBbwBraAAAAAA==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+  },
+  "Gemini": {
+    "ApiKey": "YOUR_GEMINI_API_KEY"
+  },
+  "Authentication": {
+    "Google": {
+      "ClientId": "YOUR_GOOGLE_CLIENT_ID",
+      "ClientSecret": "YOUR_GOOGLE_CLIENT_SECRET"
+    }
+  },
+  "Jwt": {
+    "Key": "dev-key-change-in-production-min-32-chars!",
+    "Issuer": "dupi"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}

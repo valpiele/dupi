@@ -12,6 +12,7 @@ obj/
 # Secrets & credentials
 google-credds
 appsettings.Development.json
+!appsettings.Development.json.example
 
 # Third-party frontend libraries (restored via libman/npm)
 wwwroot/lib/
