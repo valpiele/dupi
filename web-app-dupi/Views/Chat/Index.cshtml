@@ -8,6 +8,7 @@
     var myId           = User.FindFirst("dupi:uid")?.Value ?? "";
     var friends        = ViewBag.Friends as List<(Friendship F, UserProfile? Profile)> ?? new();
     var onlineFriendIds = ViewBag.OnlineFriendIds as HashSet<string> ?? new HashSet<string>();
+    var challengeData  = ViewBag.ChallengeData as Dictionary<int, Challenge> ?? new();
     var friendInitial  = friendProfile != null ? friendProfile.DisplayName.FirstOrDefault().ToString().ToUpper() : "";
     var friendIsOnline = activeFriendId != null && onlineFriendIds.Contains(activeFriendId);
 
@@ -25,8 +26,14 @@
 
     bool IsEmojiOnly(string s)
     {
-        var quick = new[] { "👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "💯", "😍", "🙏", "👏" };
+        var quick = new[] { "👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "💯", "😍", "🙏", "👏", "🥔" };
         return quick.Contains(s.Trim());
+    }
+
+    bool IsChallengeMsg(string content, out int cid)
+    {
+        cid = 0;
+        return content.StartsWith("challenge:") && int.TryParse(content["challenge:".Length..], out cid);
     }
 }
 
@@ -296,6 +303,111 @@
         margin-bottom: 4px;
     }
 
+    /* ── Challenge card ─────────────────────────────────── */
+    .challenge-card {
+        max-width: 300px;
+        background: #fff;
+        border: 1.5px solid #E4E6EB;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,.07);
+        cursor: pointer;
+        transition: box-shadow .15s;
+        text-decoration: none;
+        display: block;
+    }
+    .challenge-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.12); text-decoration: none; }
+    .cc-header {
+        background: linear-gradient(135deg, #0084FF 0%, #0060CC 100%);
+        padding: 12px 14px 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .cc-trophy { font-size: 1.2rem; }
+    .cc-tag { font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,.85); letter-spacing: .04em; text-transform: uppercase; }
+    .cc-status {
+        margin-left: auto;
+        font-size: 0.67rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 20px;
+        background: rgba(255,255,255,.2);
+        color: #fff;
+    }
+    .cc-status.active  { background: rgba(49,162,76,.35); }
+    .cc-status.pending { background: rgba(255,180,0,.35); }
+    .cc-body { padding: 10px 14px 12px; }
+    .cc-title {
+        font-size: 0.93rem;
+        font-weight: 700;
+        color: #050505;
+        margin-bottom: 5px;
+        line-height: 1.3;
+    }
+    .cc-meta {
+        font-size: 0.78rem;
+        color: #65676B;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .cc-pill {
+        background: #F0F2F5;
+        border-radius: 10px;
+        padding: 2px 8px;
+        font-size: 0.73rem;
+        font-weight: 500;
+        color: #050505;
+    }
+    .cc-footer {
+        padding: 8px 14px;
+        border-top: 1px solid #F0F2F5;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #0084FF;
+    }
+
+    /* ── Challenge picker popover ──────────────────────── */
+    .challenge-picker {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        width: 260px;
+        background: #fff;
+        border: 1px solid #E4E6EB;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,.14);
+        z-index: 50;
+        overflow: hidden;
+    }
+    .cp-header {
+        padding: 10px 14px 8px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #65676B;
+        border-bottom: 1px solid #F0F2F5;
+    }
+    .cp-list { max-height: 240px; overflow-y: auto; }
+    .cp-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        cursor: pointer;
+        transition: background .1s;
+    }
+    .cp-item:hover { background: #F0F2F5; }
+    .cp-emoji { font-size: 1.3rem; flex-shrink: 0; }
+    .cp-info { min-width: 0; }
+    .cp-name { font-size: 0.87rem; font-weight: 600; color: #050505; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cp-sub  { font-size: 0.74rem; color: #65676B; }
+    .cp-empty { padding: 14px; font-size: 0.83rem; color: #65676B; text-align: center; }
+
+    /* Wrapper for the + button — needed for picker positioning */
+    .plus-btn-wrap { position: relative; flex-shrink: 0; }
+
     @@media (max-width: 640px) {
         .chat-sidebar { width: 72px; }
         .convo-info, .convo-meta, .sidebar-search-wrap, .sidebar-title { display: none; }
@@ -422,18 +534,45 @@
                                             : bi == 0 ? "first"
                                             : bi == cluster.Count - 1 ? "last"
                                             : "middle";
-                                    var emojiCls = IsEmojiOnly(m.Content) ? " emoji-only" : "";
-                                    <div class="bubble-wrap">
-                                        <div class="bubble @(isOut ? "bubble-out" : "bubble-in") bpos-@pos@emojiCls">@m.Content</div>
-                                        <div class="bubble-actions">
-                                            <button class="reaction-btn" onclick="sendReaction('👍')">👍</button>
-                                            <button class="reaction-btn" onclick="sendReaction('❤️')">❤️</button>
-                                            <button class="reaction-btn" onclick="sendReaction('😂')">😂</button>
-                                            <button class="reaction-btn" onclick="sendReaction('😮')">😮</button>
-                                            <button class="reaction-btn" onclick="sendReaction('😢')">😢</button>
-                                            <button class="reaction-btn" onclick="sendReaction('😡')">😡</button>
+                                    @if (IsChallengeMsg(m.Content, out var challengeId) && challengeData.TryGetValue(challengeId, out var ch))
+                                    {
+                                        var (mName, mUnit, mEmoji) = ChallengeMetricHelper.GetInfo(ch.Metric);
+                                        var dirLabel = ch.Direction == GoalDirection.AtLeast ? "at least" : "at most";
+                                        var statusLbl = ch.Status.ToString().ToLower();
+                                        <div class="bubble-wrap">
+                                            <a href="/Challenge/Dashboard/@ch.Id" class="challenge-card" target="_blank">
+                                                <div class="cc-header">
+                                                    <span class="cc-trophy">🏆</span>
+                                                    <span class="cc-tag">Challenge</span>
+                                                    <span class="cc-status @statusLbl">@ch.Status</span>
+                                                </div>
+                                                <div class="cc-body">
+                                                    <div class="cc-title">@ch.Title</div>
+                                                    <div class="cc-meta">
+                                                        <span>@mEmoji</span>
+                                                        <span class="cc-pill">@mName @dirLabel @ch.TargetValue@mUnit</span>
+                                                        <span class="cc-pill">Ends @ch.EndDate.ToString("MMM d")</span>
+                                                    </div>
+                                                </div>
+                                                <div class="cc-footer">View Challenge →</div>
+                                            </a>
                                         </div>
-                                    </div>
+                                    }
+                                    else
+                                    {
+                                        var emojiCls = IsEmojiOnly(m.Content) ? " emoji-only" : "";
+                                        <div class="bubble-wrap">
+                                            <div class="bubble @(isOut ? "bubble-out" : "bubble-in") bpos-@pos@emojiCls">@m.Content</div>
+                                            <div class="bubble-actions">
+                                                <button class="reaction-btn" onclick="sendReaction('👍')">👍</button>
+                                                <button class="reaction-btn" onclick="sendReaction('❤️')">❤️</button>
+                                                <button class="reaction-btn" onclick="sendReaction('😂')">😂</button>
+                                                <button class="reaction-btn" onclick="sendReaction('😮')">😮</button>
+                                                <button class="reaction-btn" onclick="sendReaction('😢')">😢</button>
+                                                <button class="reaction-btn" onclick="sendReaction('😡')">😡</button>
+                                            </div>
+                                        </div>
+                                    }
                                 }
                                 <div class="bubble-time">@cluster[cluster.Count - 1].SentAt.ToString("HH:mm")</div>
                             </div>
@@ -461,6 +600,19 @@
 
             <!-- Input -->
             <div class="msg-footer">
+                <div class="plus-btn-wrap">
+                    <button id="plusBtn" class="action-btn" type="button" onclick="toggleChallengePicker(event)" title="Share challenge">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0084FF" stroke-width="2.2" stroke-linecap="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                    </button>
+                    <div id="challengePicker" class="challenge-picker d-none">
+                        <div class="cp-header">Share a Challenge</div>
+                        <div class="cp-list" id="cpList">
+                            <div class="cp-empty">Loading...</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="msg-input-wrap">
                     <input type="text" id="msgInput" class="msg-input"
                            placeholder="Aa" autocomplete="off" maxlength="2000"
@@ -640,6 +792,51 @@
             connection.invoke('SendMessage', activeFriendId, emoji).catch(console.error);
         }
 
+        // ── Challenge picker ─────────────────────────────────
+        let pickerLoaded = false;
+
+        function toggleChallengePicker(e) {
+            e.stopPropagation();
+            const picker = document.getElementById('challengePicker');
+            const isHidden = picker.classList.contains('d-none');
+            picker.classList.toggle('d-none', !isHidden);
+            if (isHidden && !pickerLoaded) loadChallengePicker();
+        }
+
+        async function loadChallengePicker() {
+            pickerLoaded = true;
+            const list = document.getElementById('cpList');
+            try {
+                const res = await fetch('/Chat/ShareableChallenges');
+                const challenges = await res.json();
+                if (!challenges.length) {
+                    list.innerHTML = '<div class="cp-empty">No active challenges.<br><a href="/Challenge" style="color:#0084FF;">Start one →</a></div>';
+                    return;
+                }
+                list.innerHTML = challenges.map(c => `
+                    <div class="cp-item" onclick="shareChallenge(${c.id})">
+                        <div class="cp-emoji">${c.emoji}</div>
+                        <div class="cp-info">
+                            <div class="cp-name">${escHtml(c.title)}</div>
+                            <div class="cp-sub">${c.metric} · ${c.status}</div>
+                        </div>
+                    </div>`).join('');
+            } catch {
+                list.innerHTML = '<div class="cp-empty">Failed to load.</div>';
+            }
+        }
+
+        function shareChallenge(id) {
+            if (!activeFriendId) return;
+            document.getElementById('challengePicker').classList.add('d-none');
+            connection.invoke('SendMessage', activeFriendId, `challenge:${id}`).catch(console.error);
+        }
+
+        // Close picker when clicking outside
+        document.addEventListener('click', () => {
+            document.getElementById('challengePicker')?.classList.add('d-none');
+        });
+
         // ── DOM helpers ──────────────────────────────────────
         function makeActionsHtml() {
             return '<div class="bubble-actions">' +
@@ -649,7 +846,80 @@
 
         function isEmojiOnly(str) { return EMOJI_QUICK.has(str.trim()); }
 
+        function isChallengeMsg(content) {
+            return content.startsWith('challenge:') && !isNaN(parseInt(content.slice(10)));
+        }
+
+        function makeChallengeCard(c) {
+            const statusCls = c.status === 'active' ? 'active' : 'pending';
+            return `<a href="${c.url}" class="challenge-card" target="_blank">
+                <div class="cc-header">
+                    <span class="cc-trophy">🏆</span>
+                    <span class="cc-tag">Challenge</span>
+                    <span class="cc-status ${statusCls}">${c.status.charAt(0).toUpperCase() + c.status.slice(1)}</span>
+                </div>
+                <div class="cc-body">
+                    <div class="cc-title">${escHtml(c.title)}</div>
+                    <div class="cc-meta">
+                        <span>${c.emoji}</span>
+                        <span class="cc-pill">${c.metric} ${c.direction} ${c.target}${c.unit}</span>
+                        <span class="cc-pill">Ends ${c.endDate}</span>
+                    </div>
+                </div>
+                <div class="cc-footer">View Challenge →</div>
+            </a>`;
+        }
+
+        async function appendChallengeMessage(isOut, content, date) {
+            const id = parseInt(content.slice(10));
+            const area = document.getElementById('messages');
+
+            // Create cluster immediately with a loading placeholder
+            const div = document.createElement('div');
+            div.className = `msg-cluster ${isOut ? 'out' : 'in'}`;
+            div.dataset.lastSentAt = date.toISOString();
+            div.dataset.isChallenge = '1';
+
+            if (!isOut) {
+                const av = document.createElement('div');
+                av.className = 'msg-avatar-small';
+                av.textContent = friendInitial;
+                div.appendChild(av);
+            }
+
+            const bubblesDiv = document.createElement('div');
+            bubblesDiv.className = 'msg-bubbles';
+            const wrap = document.createElement('div');
+            wrap.className = 'bubble-wrap';
+            wrap.innerHTML = '<div class="bubble bubble-in bpos-single" style="color:#65676B;font-size:.85rem;">Loading challenge...</div>';
+            const timeEl = document.createElement('div');
+            timeEl.className = 'bubble-time';
+            timeEl.textContent = formatTime(date);
+            bubblesDiv.appendChild(wrap);
+            bubblesDiv.appendChild(timeEl);
+            div.appendChild(bubblesDiv);
+            area.appendChild(div);
+            scrollToBottom();
+
+            try {
+                const res = await fetch(`/Chat/ChallengePreview/${id}`);
+                if (res.ok) {
+                    const c = await res.json();
+                    wrap.innerHTML = makeChallengeCard(c);
+                } else {
+                    wrap.innerHTML = '<div class="bubble bubble-in bpos-single">Challenge not found.</div>';
+                }
+            } catch {
+                wrap.innerHTML = '<div class="bubble bubble-in bpos-single">Could not load challenge.</div>';
+            }
+            scrollToBottom();
+        }
+
         function appendMessage(isOut, content, date) {
+            if (isChallengeMsg(content)) {
+                appendChallengeMessage(isOut, content, date);
+                return;
+            }
             const area = document.getElementById('messages');
             const lastCluster = area.querySelector('.msg-cluster:last-child');
             const lastIsOut   = lastCluster ? lastCluster.classList.contains('out') : null;
@@ -764,10 +1034,18 @@
                               : i === 0 ? 'first'
                               : i === cluster.length - 1 ? 'last'
                               : 'middle';
-                    const emojiCls = isEmojiOnly(m.content) ? ' emoji-only' : '';
                     const wrap = document.createElement('div');
                     wrap.className = 'bubble-wrap';
-                    wrap.innerHTML = `<div class="bubble ${isOut ? 'bubble-out' : 'bubble-in'}${emojiCls} bpos-${pos}">${escHtml(m.content)}</div>${makeActionsHtml()}`;
+                    if (isChallengeMsg(m.content)) {
+                        const cid = parseInt(m.content.slice(10));
+                        wrap.innerHTML = '<div style="color:#65676B;font-size:.85rem;">Loading challenge...</div>';
+                        fetch(`/Chat/ChallengePreview/${cid}`)
+                            .then(r => r.ok ? r.json() : null)
+                            .then(c => { if (c) wrap.innerHTML = makeChallengeCard(c); });
+                    } else {
+                        const emojiCls = isEmojiOnly(m.content) ? ' emoji-only' : '';
+                        wrap.innerHTML = `<div class="bubble ${isOut ? 'bubble-out' : 'bubble-in'}${emojiCls} bpos-${pos}">${escHtml(m.content)}</div>${makeActionsHtml()}`;
+                    }
                     bubblesDiv.appendChild(wrap);
                 });
 
