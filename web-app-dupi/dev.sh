@@ -2,10 +2,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="$SCRIPT_DIR/web-app-dupi"
-APPSETTINGS="$APP_DIR/appsettings.Development.json"
-EXAMPLE="$APP_DIR/appsettings.Development.json.example"
-GOOGLE_CREDS="$APP_DIR/google-credds"
+APPSETTINGS="$SCRIPT_DIR/appsettings.Development.json"
+EXAMPLE="$SCRIPT_DIR/appsettings.Development.json.example"
+GOOGLE_CREDS="$SCRIPT_DIR/google-credds"
 
 # ── Colours ──────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
@@ -74,5 +73,5 @@ echo -e "${GREEN}  App will be available at: http://localhost:5000${NC}"
 echo -e "${GREEN}  Press Ctrl+C to stop.${NC}"
 echo ""
 
-cd "$APP_DIR"
+cd "$SCRIPT_DIR"
 dotnet run
