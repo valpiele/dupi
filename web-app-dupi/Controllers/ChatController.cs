@@ -26,6 +26,7 @@ public class ChatController : Controller
         var conversations = await _chatService.GetConversationsAsync(UserId);
         ViewBag.Conversations = conversations;
         ViewBag.ActiveFriendId = friendId;
+        ViewBag.Friends = await _socialService.GetFriendsAsync(UserId);
 
         if (!string.IsNullOrEmpty(friendId))
         {
