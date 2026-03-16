@@ -1,9 +1,12 @@
+using System.Text;
 using dupi.Data;
 using dupi.Hubs;
 using dupi.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,7 +57,43 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/Login";
 });
 
+// JWT key — use configured key or generate a dev key
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? Environment.GetEnvironmentVariable("JWT_KEY")
+    ?? (builder.Environment.IsDevelopment() ? "dev-key-change-in-production-min-32-chars!" : null)
+    ?? throw new InvalidOperationException("Jwt:Key is not configured.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "dupi";
+
+// Dual authentication: cookies for web, JWT for API
 builder.Services.AddAuthentication()
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtIssuer,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+
+        // Allow JWT token from query string for SignalR
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    context.HttpContext.Request.Path.StartsWithSegments("/chatHub"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
+    })
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
@@ -65,6 +104,15 @@ builder.Services.AddAuthentication()
 builder.Services.AddDataProtection()
     .PersistKeysToDbContext<ApplicationDbContext>();
 
+// CORS for mobile app
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MobileApp", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<ProfileService>();
@@ -72,6 +120,7 @@ builder.Services.AddScoped<NutritionService>();
 builder.Services.AddScoped<SocialService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<ChallengeService>();
+builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<GeminiService>(c => c.Timeout = TimeSpan.FromMinutes(5));
 
 var app = builder.Build();
@@ -90,6 +139,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseCors("MobileApp");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapStaticAssets();

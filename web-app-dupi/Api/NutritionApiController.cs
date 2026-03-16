@@ -1,0 +1,278 @@
+using dupi.Dtos;
+using dupi.Hubs;
+using dupi.Models;
+using dupi.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
+
+namespace dupi.Api;
+
+[ApiController]
+[Route("api/nutrition")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+public class NutritionApiController : ControllerBase
+{
+    private readonly NutritionService _nutritionService;
+    private readonly GeminiService _geminiService;
+    private readonly ChallengeService _challengeService;
+    private readonly IHubContext<ChatHub> _hubContext;
+
+    private static readonly string[] AllowedMimeTypes =
+        ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+    public NutritionApiController(
+        NutritionService nutritionService,
+        GeminiService geminiService,
+        ChallengeService challengeService,
+        IHubContext<ChatHub> hubContext)
+    {
+        _nutritionService = nutritionService;
+        _geminiService = geminiService;
+        _challengeService = challengeService;
+        _hubContext = hubContext;
+    }
+
+    private string UserId => User.FindFirstValue("dupi:uid")!;
+
+    [HttpGet]
+    public async Task<IActionResult> GetPlans()
+    {
+        var plans = await _nutritionService.GetPlansAsync(UserId);
+        var today = DateTime.UtcNow.Date;
+        var todayPlans = plans.Where(p => p.CreatedAt.Date == today).ToList();
+        var streak = ComputeStreak(plans, today);
+
+        await _challengeService.TransitionChallengesAsync();
+        var activeChallenge = await _challengeService.GetActiveChallengeForUserAsync(UserId);
+
+        var result = new NutritionIndexDto
+        {
+            Plans = plans.Select(MapPlan).ToList(),
+            TodayPlans = todayPlans.Select(MapPlan).ToList(),
+            CurrentStreak = streak
+        };
+
+        if (activeChallenge != null)
+        {
+            double todayMetric;
+            if (activeChallenge.Metric == ChallengeMetric.Score)
+            {
+                var scored = todayPlans.Where(p => p.Score > 0).ToList();
+                todayMetric = scored.Count > 0 ? scored.Average(p => p.Score) : 0;
+            }
+            else
+            {
+                todayMetric = todayPlans.Sum(p => ChallengeMetricHelper.ExtractValue(p, activeChallenge.Metric));
+            }
+
+            result.ActiveChallenge = new ActiveChallengeDto
+            {
+                Id = activeChallenge.Id,
+                Title = activeChallenge.Title,
+                Metric = activeChallenge.Metric.ToString(),
+                TargetValue = activeChallenge.TargetValue,
+                Direction = activeChallenge.Direction.ToString(),
+                TodayMetricValue = todayMetric
+            };
+        }
+
+        return Ok(result);
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetPlan(string id)
+    {
+        var plan = await _nutritionService.GetPlanAsync(UserId, id);
+        if (plan == null) return NotFound();
+        return Ok(MapPlan(plan));
+    }
+
+    [HttpPost("analyze")]
+    public async Task Analyze([FromForm] string? title, [FromForm] string? mealType,
+        [FromForm] string? description, IFormFile? file)
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["X-Accel-Buffering"] = "no";
+
+        async Task Send(object payload)
+        {
+            await Response.WriteAsync($"data: {JsonSerializer.Serialize(payload)}\n\n");
+            await Response.Body.FlushAsync();
+        }
+
+        if (file == null && string.IsNullOrWhiteSpace(description))
+        {
+            await Send(new { type = "error", message = "Please upload a file or enter a description." });
+            return;
+        }
+
+        byte[]? fileData = null;
+        string? mimeType = null;
+        string? extension = null;
+
+        if (file != null && file.Length > 0)
+        {
+            if (file.Length > 10 * 1024 * 1024)
+            {
+                await Send(new { type = "error", message = "File must be under 10MB." });
+                return;
+            }
+
+            mimeType = file.ContentType.ToLower();
+            if (!AllowedMimeTypes.Contains(mimeType))
+            {
+                await Send(new { type = "error", message = "Only images (JPEG, PNG, WebP) and PDFs are accepted." });
+                return;
+            }
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            fileData = ms.ToArray();
+            extension = Path.GetExtension(file.FileName).ToLower();
+        }
+
+        var contextSummary = await _nutritionService.GetRecentContextSummaryAsync(UserId);
+        var outputBuffer = new StringBuilder();
+
+        try
+        {
+            await foreach (var (isThinking, text) in _geminiService.StreamAnalyzeNutritionAsync(
+                description, fileData, mimeType, contextSummary, HttpContext.RequestAborted))
+            {
+                if (isThinking)
+                    await Send(new { type = "thinking", text });
+                else
+                {
+                    outputBuffer.Append(text);
+                    await Send(new { type = "output", text });
+                }
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex)
+        {
+            await Send(new { type = "error", message = $"Analysis failed: {ex.Message}" });
+            return;
+        }
+
+        NutritionAnalysis analysis;
+        try
+        {
+            analysis = JsonSerializer.Deserialize<NutritionAnalysis>(outputBuffer.ToString())
+                ?? throw new InvalidOperationException("Empty response.");
+        }
+        catch (Exception ex)
+        {
+            await Send(new { type = "error", message = $"Could not parse result: {ex.Message}" });
+            return;
+        }
+
+        var plan = new NutritionPlan
+        {
+            UserId = UserId,
+            Title = string.IsNullOrWhiteSpace(title) ? "Nutrition Plan" : title.Trim(),
+            InputType = fileData != null ? (mimeType!.StartsWith("image") ? "image" : "pdf") : "text",
+            MealType = string.IsNullOrWhiteSpace(mealType) ? null : mealType.Trim().ToLower(),
+            HasFile = fileData != null,
+            FileExtension = extension,
+            FoodDescription = analysis.FoodDescription,
+            CaloriesMin = analysis.CaloriesMin,
+            CaloriesMax = analysis.CaloriesMax,
+            Proteins = analysis.Proteins,
+            Carbohydrates = analysis.Carbohydrates,
+            Fats = analysis.Fats,
+            Fiber = analysis.Fiber,
+            Sugar = analysis.Sugar,
+            Sodium = analysis.Sodium,
+            WhatsGood = analysis.WhatsGood,
+            WhatToImprove = analysis.WhatToImprove,
+            Score = analysis.Score,
+            ScoreSummary = analysis.ScoreSummary
+        };
+
+        await _nutritionService.SavePlanAsync(plan);
+
+        if (fileData != null && extension != null)
+        {
+            using var ms = new MemoryStream(fileData);
+            await _nutritionService.SaveFileAsync(UserId, plan.Id, extension, ms);
+        }
+
+        var activeChallenge = await _challengeService.GetActiveChallengeForUserAsync(UserId);
+        if (activeChallenge != null)
+        {
+            var participants = await _challengeService.ComputeLeaderboardAsync(activeChallenge.Id);
+            var displayName = User.FindFirstValue(ClaimTypes.Name) ?? "Someone";
+            var (metricName, metricUnit, _) = ChallengeMetricHelper.GetInfo(activeChallenge.Metric);
+            var metricValue = ChallengeMetricHelper.ExtractValue(plan, activeChallenge.Metric);
+            foreach (var p in participants.Where(p => p.UserId != UserId))
+            {
+                await _hubContext.Clients.Group(p.UserId).SendAsync("ChallengeUpdate", new
+                {
+                    challengeId = activeChallenge.Id,
+                    userId = UserId,
+                    displayName,
+                    metricValue,
+                    message = $"{displayName} logged {metricValue:0}{metricUnit} {metricName.ToLower()}!"
+                });
+            }
+        }
+
+        await Send(new { type = "done", plan = MapPlan(plan) });
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        await _nutritionService.DeletePlanAsync(UserId, id);
+        return NoContent();
+    }
+
+    private static NutritionPlanDto MapPlan(NutritionPlan p) => new()
+    {
+        Id = p.Id,
+        Title = p.Title,
+        CreatedAt = p.CreatedAt,
+        MealType = p.MealType,
+        InputType = p.InputType,
+        HasFile = p.HasFile,
+        FoodDescription = p.FoodDescription,
+        CaloriesMin = p.CaloriesMin,
+        CaloriesMax = p.CaloriesMax,
+        Proteins = p.Proteins,
+        Carbohydrates = p.Carbohydrates,
+        Fats = p.Fats,
+        Fiber = p.Fiber,
+        Sugar = p.Sugar,
+        Sodium = p.Sodium,
+        WhatsGood = p.WhatsGood,
+        WhatToImprove = p.WhatToImprove,
+        Score = p.Score,
+        ScoreSummary = p.ScoreSummary
+    };
+
+    private static int ComputeStreak(List<NutritionPlan> plans, DateTime today)
+    {
+        var loggedDates = plans.Select(p => p.CreatedAt.Date).Distinct().OrderByDescending(d => d).ToList();
+        if (loggedDates.Count == 0) return 0;
+
+        var start = loggedDates[0] == today ? today
+            : loggedDates[0] == today.AddDays(-1) ? today.AddDays(-1) : (DateTime?)null;
+        if (start == null) return 0;
+
+        int streak = 0;
+        var expected = start.Value;
+        foreach (var date in loggedDates)
+        {
+            if (date == expected) { streak++; expected = expected.AddDays(-1); }
+            else if (date < expected) break;
+        }
+        return streak;
+    }
+}
