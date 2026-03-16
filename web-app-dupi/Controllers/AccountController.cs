@@ -1,5 +1,6 @@
 using dupi.Data;
 using dupi.Models;
+using dupi.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -10,13 +11,16 @@ public class AccountController : Controller
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
+    private readonly ProfileService _profileService;
 
     public AccountController(
         UserManager<ApplicationUser> userManager,
-        SignInManager<ApplicationUser> signInManager)
+        SignInManager<ApplicationUser> signInManager,
+        ProfileService profileService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
+        _profileService = profileService;
     }
 
     // GET /Account/Login
@@ -67,6 +71,11 @@ public class AccountController : Controller
         if (result.Succeeded)
         {
             await _userManager.AddClaimAsync(user, new Claim("dupi:uid", user.Id));
+
+            // Auto-create a default profile so other users can see this account's info immediately
+            var defaultProfile = _profileService.GetProfile(user.Id, model.Email, model.Email);
+            _profileService.SaveProfile(defaultProfile);
+
             await _signInManager.SignInAsync(user, isPersistent: false);
             return RedirectToAction("Index", "Discover");
         }
@@ -119,6 +128,11 @@ public class AccountController : Controller
             // Store Google sub ID as the canonical blob key for this user
             await _userManager.AddClaimAsync(user, new Claim("dupi:uid", info.ProviderKey));
             await _userManager.AddLoginAsync(user, info);
+
+            var displayName = info.Principal.FindFirstValue(ClaimTypes.Name) ?? email;
+            var defaultProfile = _profileService.GetProfile(info.ProviderKey, email, displayName);
+            _profileService.SaveProfile(defaultProfile);
+
             await _signInManager.SignInAsync(user, isPersistent: false);
             return LocalRedirect(returnUrl);
         }

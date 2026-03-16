@@ -17,16 +17,20 @@ public class AuthApiController : ControllerBase
     private readonly JwtTokenService _jwtTokenService;
     private readonly IConfiguration _config;
 
+    private readonly ProfileService _profileService;
+
     public AuthApiController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         JwtTokenService jwtTokenService,
-        IConfiguration config)
+        IConfiguration config,
+        ProfileService profileService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _jwtTokenService = jwtTokenService;
         _config = config;
+        _profileService = profileService;
     }
 
     [HttpPost("login")]
@@ -63,6 +67,9 @@ public class AuthApiController : ControllerBase
             return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
 
         await _userManager.AddClaimAsync(user, new Claim("dupi:uid", user.Id));
+
+        var defaultProfile = _profileService.GetProfile(user.Id, user.Email!, user.Email!);
+        _profileService.SaveProfile(defaultProfile);
 
         var token = _jwtTokenService.GenerateToken(user.Id, user.Id, user.Email!, user.UserName);
         return Ok(new AuthResponse
