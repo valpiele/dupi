@@ -27,7 +27,7 @@ public class ProfileService
             var profile = JsonSerializer.Deserialize<UserProfile>(content);
             if (profile != null) return profile;
         }
-        return new UserProfile
+        var created = new UserProfile
         {
             UserId = userId,
             Username = SuggestUsername(displayName, userId),
@@ -35,6 +35,8 @@ public class ProfileService
             DisplayName = displayName,
             IsPublic = false
         };
+        SaveProfile(created);
+        return created;
     }
 
     public void SaveProfile(UserProfile profile)

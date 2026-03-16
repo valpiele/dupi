@@ -471,7 +471,7 @@
                         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                     </svg>
                 </button>
-                <button id="likeBtn" class="action-btn like-btn" type="button" onclick="sendLike()" title="Like">👍</button>
+                <button id="likeBtn" class="action-btn like-btn" type="button" onclick="sendLike()" title="Like">🥔</button>
             </div>
         }
     </div>
@@ -632,7 +632,7 @@
 
         function sendLike() {
             if (!activeFriendId) return;
-            connection.invoke('SendMessage', activeFriendId, '👍').catch(console.error);
+            connection.invoke('SendMessage', activeFriendId, '🥔').catch(console.error);
         }
 
         function sendReaction(emoji) {
