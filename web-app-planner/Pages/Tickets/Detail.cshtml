@@ -1,0 +1,88 @@
+@page "{id:int}"
+@model Planner.Pages.Tickets.DetailModel
+@using Planner.Models
+@{
+    ViewData["Title"] = Model.Ticket.Title;
+
+    var typeBadge  = Model.Ticket.Type == TicketType.Feature ? "info text-dark" : "danger";
+    var typeLabel  = Model.Ticket.Type == TicketType.Feature ? "Feature" : "Bug";
+    var stateBadge = Model.Ticket.State switch
+    {
+        TicketState.Open       => "secondary",
+        TicketState.InProgress => "primary",
+        TicketState.Closed     => "success",
+        _                      => "secondary"
+    };
+    var stateLabel = Model.Ticket.State switch
+    {
+        TicketState.Open       => "Open",
+        TicketState.InProgress => "In Progress",
+        TicketState.Closed     => "Closed",
+        _                      => ""
+    };
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        @* Ticket header *@
+        <div class="d-flex align-items-start mb-3">
+            <a asp-page="/Projects/Detail" asp-route-id="@Model.Ticket.ProjectId" class="btn btn-outline-secondary btn-sm me-3 mt-1">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <span class="badge bg-@typeBadge">@typeLabel</span>
+                    <span class="badge bg-@stateBadge">@stateLabel</span>
+                </div>
+                <h2 class="mb-0">@Model.Ticket.Title</h2>
+                <p class="text-muted small mt-1">
+                    @Model.Ticket.Author.DisplayName &middot; @Model.Ticket.CreatedAt.ToString("MMM d, yyyy")
+                </p>
+            </div>
+            <a asp-page="/Tickets/Edit" asp-route-id="@Model.Ticket.Id" class="btn btn-outline-secondary btn-sm ms-2">
+                <i class="bi bi-pencil"></i>
+            </a>
+        </div>
+
+        @* Description *@
+        @if (!string.IsNullOrWhiteSpace(Model.Ticket.Description))
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <p class="mb-0" style="white-space: pre-wrap;">@Model.Ticket.Description</p>
+                </div>
+            </div>
+        }
+
+        @* Comments *@
+        <h5 class="mb-3">Comments <span class="text-muted small">(@Model.Ticket.Comments.Count)</span></h5>
+
+        @foreach (var c in Model.Ticket.Comments)
+        {
+            <div class="card border-0 shadow-sm mb-2">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="fw-medium small">@c.Author.DisplayName</span>
+                        <span class="text-muted small">@c.CreatedAt.ToString("MMM d, yyyy HH:mm")</span>
+                    </div>
+                    <p class="mb-0 small" style="white-space: pre-wrap;">@c.Body</p>
+                </div>
+            </div>
+        }
+
+        @* Add comment *@
+        <div class="card border-0 shadow-sm mt-3">
+            <div class="card-body p-3">
+                <form method="post" asp-page-handler="AddComment">
+                    <div class="mb-2">
+                        <textarea asp-for="CommentBody" class="form-control" rows="3" placeholder="Add a comment..."></textarea>
+                        <span asp-validation-for="CommentBody" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-dark btn-sm">
+                        <i class="bi bi-chat me-1"></i> Comment
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

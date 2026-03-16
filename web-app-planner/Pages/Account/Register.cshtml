@@ -1,0 +1,44 @@
+@page
+@model Planner.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Register";
+    Layout = "_Layout";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h4 class="mb-4">Create an account</h4>
+                <form method="post">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger d-none" id="validationSummary"></div>
+                    <div class="mb-3">
+                        <label asp-for="Input.DisplayName" class="form-label">Display Name</label>
+                        <input asp-for="Input.DisplayName" class="form-control" autocomplete="name" />
+                        <span asp-validation-for="Input.DisplayName" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Input.Email" class="form-label">Email</label>
+                        <input asp-for="Input.Email" class="form-control" autocomplete="email" />
+                        <span asp-validation-for="Input.Email" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Input.Password" class="form-label">Password</label>
+                        <input asp-for="Input.Password" type="password" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="Input.Password" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-4">
+                        <label asp-for="Input.ConfirmPassword" class="form-label">Confirm Password</label>
+                        <input asp-for="Input.ConfirmPassword" type="password" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="Input.ConfirmPassword" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100">Register</button>
+                </form>
+                <hr />
+                <p class="text-center mb-0 small">
+                    Already have an account? <a asp-page="/Account/Login">Sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
