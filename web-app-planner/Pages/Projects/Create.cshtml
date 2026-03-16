@@ -1,0 +1,33 @@
+@page
+@model Planner.Pages.Projects.CreateModel
+@{
+    ViewData["Title"] = "New Project";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="d-flex align-items-center mb-4">
+            <a asp-page="/Projects/Index" class="btn btn-outline-secondary btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h2 class="mb-0">New Project</h2>
+        </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <form method="post">
+                    <div class="mb-3">
+                        <label asp-for="Input.Name" class="form-label">Project Name</label>
+                        <input asp-for="Input.Name" class="form-control" placeholder="e.g. My Awesome App" />
+                        <span asp-validation-for="Input.Name" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-4">
+                        <label asp-for="Input.Description" class="form-label">Description <span class="text-muted">(optional)</span></label>
+                        <textarea asp-for="Input.Description" class="form-control" rows="3" placeholder="Short project description..."></textarea>
+                        <span asp-validation-for="Input.Description" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100">Create Project</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

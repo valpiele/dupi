@@ -1,0 +1,80 @@
+@page "{id:int}"
+@model Planner.Pages.Projects.DetailModel
+@using Planner.Models
+@{
+    ViewData["Title"] = Model.Project.Name;
+}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <a asp-page="/Projects/Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h2 class="mb-0">@Model.Project.Name</h2>
+        </div>
+        @if (!string.IsNullOrEmpty(Model.Project.Description))
+        {
+            <p class="text-muted mt-1 mb-0 ms-5">@Model.Project.Description</p>
+        }
+    </div>
+    <div class="d-flex gap-2">
+        @if (Model.IsOwner)
+        {
+            <a asp-page="/Projects/Invite" asp-route-id="@Model.Project.Id" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-person-plus me-1"></i> Invite
+            </a>
+        }
+        <a asp-page="/Tickets/Create" asp-route-projectId="@Model.Project.Id" class="btn btn-dark btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Add Ticket
+        </a>
+    </div>
+</div>
+
+@* State filter *@
+<div class="mb-4">
+    <div class="btn-group btn-group-sm" role="group">
+        <a asp-page="/Projects/Detail" asp-route-id="@Model.Project.Id"
+           class="btn @(Model.StateFilter == null ? "btn-dark" : "btn-outline-secondary")">All</a>
+        <a asp-page="/Projects/Detail" asp-route-id="@Model.Project.Id" asp-route-state="Open"
+           class="btn @(Model.StateFilter == TicketState.Open ? "btn-dark" : "btn-outline-secondary")">Open</a>
+        <a asp-page="/Projects/Detail" asp-route-id="@Model.Project.Id" asp-route-state="InProgress"
+           class="btn @(Model.StateFilter == TicketState.InProgress ? "btn-dark" : "btn-outline-secondary")">In Progress</a>
+        <a asp-page="/Projects/Detail" asp-route-id="@Model.Project.Id" asp-route-state="Closed"
+           class="btn @(Model.StateFilter == TicketState.Closed ? "btn-dark" : "btn-outline-secondary")">Closed</a>
+    </div>
+</div>
+
+<div class="row g-4">
+    @* Features column *@
+    <div class="col-md-6">
+        <div class="d-flex align-items-center mb-2">
+            <span class="badge bg-info text-dark me-2">Feature</span>
+            <span class="text-muted small">@Model.Features.Count ticket(s)</span>
+        </div>
+        @if (!Model.Features.Any())
+        {
+            <p class="text-muted small fst-italic">No features match the filter.</p>
+        }
+        @foreach (var t in Model.Features)
+        {
+            <partial name="_TicketCard" model="t" />
+        }
+    </div>
+
+    @* Bugs column *@
+    <div class="col-md-6">
+        <div class="d-flex align-items-center mb-2">
+            <span class="badge bg-danger me-2">Bug</span>
+            <span class="text-muted small">@Model.Bugs.Count ticket(s)</span>
+        </div>
+        @if (!Model.Bugs.Any())
+        {
+            <p class="text-muted small fst-italic">No bugs match the filter.</p>
+        }
+        @foreach (var t in Model.Bugs)
+        {
+            <partial name="_TicketCard" model="t" />
+        }
+    </div>
+</div>

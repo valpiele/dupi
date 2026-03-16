@@ -1,0 +1,45 @@
+@page
+@model Planner.Pages.Tickets.CreateModel
+@using Planner.Models
+@{
+    ViewData["Title"] = "New Ticket";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="d-flex align-items-center mb-4">
+            <a asp-page="/Projects/Detail" asp-route-id="@Model.ProjectId" class="btn btn-outline-secondary btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h2 class="mb-0">New Ticket</h2>
+        </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <form method="post">
+                    <input type="hidden" asp-for="ProjectId" />
+                    <div class="mb-3">
+                        <label asp-for="Input.Title" class="form-label">Title</label>
+                        <input asp-for="Input.Title" class="form-control" placeholder="Short descriptive title" />
+                        <span asp-validation-for="Input.Title" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Input.Description" class="form-label">Description <span class="text-muted">(optional)</span></label>
+                        <textarea asp-for="Input.Description" class="form-control" rows="4" placeholder="Details, steps to reproduce, acceptance criteria..."></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label d-block">Type</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" asp-for="Input.Type" value="Feature" id="typeFeature" checked />
+                            <label class="form-check-label" for="typeFeature">Feature</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" asp-for="Input.Type" value="Bug" id="typeBug" />
+                            <label class="form-check-label" for="typeBug">Bug</label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100">Create Ticket</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,43 @@
+@page "{id:int}"
+@model Planner.Pages.Tickets.EditModel
+@using Planner.Models
+@{
+    ViewData["Title"] = "Edit Ticket";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="d-flex align-items-center mb-4">
+            <a asp-page="/Tickets/Detail" asp-route-id="@Model.Ticket.Id" class="btn btn-outline-secondary btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h2 class="mb-0">Edit Ticket</h2>
+        </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <form method="post">
+                    <div class="mb-3">
+                        <label asp-for="Input.Title" class="form-label">Title</label>
+                        <input asp-for="Input.Title" class="form-control" />
+                        <span asp-validation-for="Input.Title" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Input.Description" class="form-label">Description</label>
+                        <textarea asp-for="Input.Description" class="form-control" rows="5"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Input.Type" class="form-label">Type</label>
+                        <select asp-for="Input.Type" class="form-select"
+                                asp-items="Html.GetEnumSelectList<TicketType>()"></select>
+                    </div>
+                    <div class="mb-4">
+                        <label asp-for="Input.State" class="form-label">State</label>
+                        <select asp-for="Input.State" class="form-select"
+                                asp-items="Html.GetEnumSelectList<TicketState>()"></select>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
