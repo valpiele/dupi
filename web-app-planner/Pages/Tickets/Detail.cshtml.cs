@@ -25,6 +25,18 @@ public class DetailModel : PageModel
         return await LoadTicketAsync(id) ?? Page();
     }
 
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        var guard = await LoadTicketAsync(id);
+        if (guard != null) return guard;
+
+        var projectId = Ticket.ProjectId;
+        _db.Tickets.Remove(Ticket);
+        await _db.SaveChangesAsync();
+
+        return RedirectToPage("/Projects/Detail", new { id = projectId });
+    }
+
     public async Task<IActionResult> OnPostAddCommentAsync(int id)
     {
         var guard = await LoadTicketAsync(id);
