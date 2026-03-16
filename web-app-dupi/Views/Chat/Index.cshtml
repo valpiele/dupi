@@ -6,6 +6,8 @@
     var activeFriendId = ViewBag.ActiveFriendId as string;
     var friendProfile  = ViewBag.FriendProfile as UserProfile;
     var myId = User.FindFirst("dupi:uid")?.Value ?? "";
+    var friends = ViewBag.Friends as List<(Friendship F, UserProfile? Profile)> ?? new();
+    var convoFriendIds = conversations.Select(c => c.FriendId).ToHashSet();
 }
 
 <style>
@@ -122,7 +124,15 @@
 <div class="chat-layout mt-3">
     <!-- Sidebar: conversation list -->
     <div class="chat-sidebar">
-        <div class="p-3 border-bottom fw-semibold small text-muted text-uppercase" style="letter-spacing:.05rem;">Messages</div>
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+            <span class="fw-semibold small text-muted text-uppercase" style="letter-spacing:.05rem;">Messages</span>
+            <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#newChatModal" title="New chat">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                    <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+                </svg>
+            </button>
+        </div>
         @if (!conversations.Any())
         {
             <div class="p-3 text-muted small text-center mt-4">No conversations yet.<br />
@@ -192,6 +202,45 @@
                 <button type="submit" class="btn btn-dark btn-sm px-4">Send</button>
             </form>
         }
+    </div>
+</div>
+
+<!-- New Chat Modal -->
+<div class="modal fade" id="newChatModal" tabindex="-1" aria-labelledby="newChatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="newChatModalLabel">New Chat</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <input type="text" id="friendSearch" class="form-control form-control-sm border-0 border-bottom rounded-0 px-3 py-2"
+                       placeholder="Search friends..." oninput="filterFriends()" />
+                <div id="friendList">
+                    @if (!friends.Any())
+                    {
+                        <div class="p-3 text-muted small text-center">
+                            No friends yet. <a asp-controller="Friends" asp-action="Index" class="text-primary">Add friends</a>
+                        </div>
+                    }
+                    @foreach (var (f, prof) in friends)
+                    {
+                        var fid = f.SenderId == myId ? f.ReceiverId : f.SenderId;
+                        var name = prof?.DisplayName ?? "User";
+                        <a href="/Chat?friendId=@fid" class="convo-item friend-item" data-name="@name.ToLower()">
+                            <div class="convo-avatar">@name.FirstOrDefault().ToString().ToUpper()</div>
+                            <div class="convo-info overflow-hidden flex-grow-1">
+                                <span class="fw-semibold small">@name</span>
+                                @if (prof != null && !string.IsNullOrEmpty(prof.Username))
+                                {
+                                    <div class="convo-last">@@@prof.Username</div>
+                                }
+                            </div>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -275,6 +324,13 @@
 
         function formatTime(d) {
             return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function filterFriends() {
+            const q = document.getElementById('friendSearch').value.toLowerCase();
+            document.querySelectorAll('.friend-item').forEach(el => {
+                el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+            });
         }
     </script>
 }
