@@ -1,3 +1,4 @@
+using dupi.Hubs;
 using dupi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,9 +25,15 @@ public class ChatController : Controller
     public async Task<IActionResult> Index(string? friendId)
     {
         var conversations = await _chatService.GetConversationsAsync(UserId);
+        var friends = await _socialService.GetFriendsAsync(UserId);
+
         ViewBag.Conversations = conversations;
         ViewBag.ActiveFriendId = friendId;
-        ViewBag.Friends = await _socialService.GetFriendsAsync(UserId);
+        ViewBag.Friends = friends;
+        ViewBag.OnlineFriendIds = friends
+            .Select(x => x.F.SenderId == UserId ? x.F.ReceiverId : x.F.SenderId)
+            .Where(ChatHub.IsOnline)
+            .ToHashSet();
 
         if (!string.IsNullOrEmpty(friendId))
         {
@@ -36,6 +43,7 @@ public class ChatController : Controller
             var messages = await _chatService.GetMessagesAsync(UserId, friendId);
             ViewBag.Messages = messages;
             ViewBag.FriendProfile = _profileService.GetProfileByUserId(friendId);
+            ViewBag.FriendIsOnline = ChatHub.IsOnline(friendId);
 
             await _chatService.MarkReadAsync(UserId, friendId);
         }
