@@ -1,4 +1,4 @@
-# Build output
+# .NET build output
 bin/
 obj/
 
@@ -18,3 +18,9 @@ wwwroot/lib/
 
 # Uploads (local dev only, now on Azure Blob)
 wwwroot/uploads/
+
+# React Native / Expo
+node_modules/
+mobile-app-dupi/.expo/
+mobile-app-dupi/dist/
+*.tsbuildinfo
