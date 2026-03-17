@@ -221,6 +221,107 @@ public class GeminiService
         }
     }
 
+    public async Task<DailyFunFact> GenerateDailyFunFactAsync(
+        UserProfile profile, List<Challenge> activeChallenges,
+        CancellationToken ct = default)
+    {
+        var schema = new
+        {
+            type = "OBJECT",
+            properties = new
+            {
+                fact  = new { type = "STRING", description = "An interesting or surprising fun fact (1-2 sentences) personalized to the user's goals, diet, and active challenges" },
+                tip   = new { type = "STRING", description = "A quick, actionable tip for today (1 sentence)" },
+                emoji = new { type = "STRING", description = "A single relevant emoji" }
+            },
+            required = new[] { "fact", "tip", "emoji" }
+        };
+
+        var challengeInfo = activeChallenges.Count > 0
+            ? string.Join("\n", activeChallenges.Select(c =>
+                $"- {c.Title}: track {ChallengeMetricHelper.GetInfo(c.Metric).Name} " +
+                $"({(c.Direction == GoalDirection.AtLeast ? "at least" : "at most")} " +
+                $"{c.TargetValue} {ChallengeMetricHelper.GetInfo(c.Metric).Unit}/day), ends {c.EndDate:MMM d}"))
+            : "No active challenges.";
+
+        var prompt = $"""
+            You are a friendly nutrition and wellness coach.
+            Generate a personalized daily fun fact for a user based on their goals, diet type, and active challenges.
+            The fact should be interesting, surprising, and directly relevant to their context — not generic advice.
+            The tip should be concrete and actionable for today specifically.
+
+            --- User context ---
+            Goals: {(string.IsNullOrWhiteSpace(profile.Goals) ? "not specified" : profile.Goals)}
+            Diet type: {(string.IsNullOrWhiteSpace(profile.DietType) ? "no specific diet" : profile.DietType)}
+            Active challenges:
+            {challengeInfo}
+            --- End of context ---
+            """;
+
+        var body = new
+        {
+            contents = new[] { new { parts = new[] { new { text = prompt } } } },
+            generationConfig = new
+            {
+                responseMimeType = "application/json",
+                responseSchema = schema
+            }
+        };
+
+        var url = string.Format(StreamEndpoint, _apiKey);
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body)
+        };
+
+        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Gemini API error {(int)response.StatusCode}: {error}");
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+        var fullText = new System.Text.StringBuilder();
+
+        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct);
+            if (line == null || !line.StartsWith("data: ")) continue;
+
+            JsonElement chunk;
+            try { chunk = JsonSerializer.Deserialize<JsonElement>(line["data: ".Length..]); }
+            catch { continue; }
+
+            if (!chunk.TryGetProperty("candidates", out var candidates) || candidates.GetArrayLength() == 0) continue;
+            if (!candidates[0].TryGetProperty("content", out var content)) continue;
+            if (!content.TryGetProperty("parts", out var parts)) continue;
+
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (!part.TryGetProperty("text", out var textEl)) continue;
+                fullText.Append(textEl.GetString() ?? "");
+            }
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<DailyFunFact>(fullText.ToString()) ?? FallbackFact();
+        }
+        catch
+        {
+            return FallbackFact();
+        }
+    }
+
+    private static DailyFunFact FallbackFact() => new()
+    {
+        Fact = "Consistency is the most powerful tool in nutrition — even small daily improvements compound over time.",
+        Tip = "Log your next meal as soon as you eat it for the most accurate tracking.",
+        Emoji = "💡"
+    };
+
     private object BuildBody(string? userText, byte[]? fileData, string? mimeType, string? contextSummary, bool withThinking)
     {
         var parts = new List<object>();

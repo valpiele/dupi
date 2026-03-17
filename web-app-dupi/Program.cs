@@ -113,13 +113,15 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader());
 });
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddRazorRuntimeCompilation();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<NutritionService>();
 builder.Services.AddScoped<SocialService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<ChallengeService>();
+builder.Services.AddScoped<FunFactService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<GeminiService>(c => c.Timeout = TimeSpan.FromMinutes(5));
 
